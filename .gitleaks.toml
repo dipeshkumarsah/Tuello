@@ -1,0 +1,15 @@
+# Secret scanning config. Extends the default rules; only allows the documented, non-secret
+# development values used by docker-compose, CI, and tests.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Local development and CI placeholder values"
+regexes = [
+  '''tuello-dev-secret''',
+  '''tuello_app_test_password''',
+  '''ZGV2LW9ubHktZW5jcnlwdGlvbi1rZXktMzItYnl0ZXM=''',
+  '''Y2ktb25seS1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcyE=''',
+  '''correct horse battery staple''',
+  '''tuello-demo-password''',
+]

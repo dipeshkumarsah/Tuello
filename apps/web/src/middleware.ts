@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { classifyHost } from '@tuello/shared/dist/host';
+import { internalPath } from './lib/routing';
 
 /**
  * One Next.js app serves every host. The host decides which tree renders:
@@ -8,15 +8,18 @@ import { classifyHost } from '@tuello/shared/dist/host';
  * The URL in the browser never changes. /api/* is proxied to the API as-is.
  */
 export function middleware(req: NextRequest) {
-  const base = process.env.APP_BASE_DOMAIN ?? 'tuello.localhost';
   const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host');
-  const kind = classifyHost(host, base).kind;
+  const path = internalPath(
+    host,
+    req.nextUrl.pathname,
+    process.env.APP_BASE_DOMAIN ?? 'tuello.localhost',
+  );
+  if (!path) return new NextResponse('Not found', { status: 404 });
   const url = req.nextUrl.clone();
-  if (kind === 'invalid') return new NextResponse('Not found', { status: 404 });
-  url.pathname = `${kind === 'apex' ? '/apex' : '/t'}${url.pathname === '/' ? '' : url.pathname}`;
+  url.pathname = path;
   return NextResponse.rewrite(url);
 }
 
 export const config = {
-  matcher: ['/((?!api/|_next/|favicon.ico|robots.txt).*)'],
+  matcher: ['/((?!api/|_next/|healthz|favicon.ico|robots.txt).*)'],
 };

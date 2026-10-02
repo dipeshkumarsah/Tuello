@@ -24,6 +24,23 @@ if (process.env.SENTRY_DSN) {
     tracesSampleRate: 0,
     skipOpenTelemetrySetup: true,
     sendDefaultPii: false,
+    // Never ship tokens, cookies or bodies to the error tracker.
+    beforeSend(event) {
+      if (event.request) {
+        if (event.request.url)
+          event.request.url = event.request.url
+            .split('?')[0]!
+            .replace(/\/token\/[^/]+/g, '/token/[redacted]');
+        delete event.request.query_string;
+        delete event.request.cookies;
+        delete event.request.data;
+        if (event.request.headers) {
+          for (const h of ['cookie', 'authorization', 'x-csrf-token'])
+            delete event.request.headers[h];
+        }
+      }
+      return event;
+    },
   });
 }
 

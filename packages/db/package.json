@@ -23,14 +23,14 @@
   "dependencies": {
     "@prisma/client": "6.19.3",
     "@tuello/shared": "workspace:*",
-    "argon2": "^0.44.0"
+    "argon2": "^0.44.0",
+    "prisma": "6.19.3"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^11.14.0",
     "@types/node": "^22.18.0",
     "@types/pg": "^8.15.5",
     "pg": "^8.16.3",
-    "prisma": "6.19.3",
     "testcontainers": "^11.14.0",
     "vitest": "^3.2.7"
   }

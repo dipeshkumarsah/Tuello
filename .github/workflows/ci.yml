@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  TURBO_TELEMETRY_DISABLED: '1'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  checks:
+    name: Lint, types, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm build
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Storybook builds
+        run: pnpm --filter @tuello/ui build-storybook
+
+  integration:
+    name: Integration (Testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build --filter "./packages/*"
+      # RLS proofs, schema drift, API (Supertest) and worker suites against real PostgreSQL 16,
+      # Valkey and Mailpit containers.
+      - run: pnpm test:integration
+
+  e2e:
+    name: End to end (Playwright)
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://tuello_app:tuello_app@localhost:6432/tuello?pgbouncer=true
+      DIRECT_DATABASE_URL: postgresql://tuello:tuello@localhost:5432/tuello
+      VALKEY_URL: redis://localhost:6379
+      APP_BASE_DOMAIN: tuello.localhost
+      APP_PUBLIC_PROTOCOL: http
+      APP_PUBLIC_PORT: '3000'
+      COOKIE_SECURE: 'false'
+      ENCRYPTION_KEY: Y2ktb25seS1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcyE=
+      SMTP_URL: smtp://localhost:1025
+      EMAIL_FROM_ADDRESS: no-reply@mail.tuello.localhost
+      API_INTERNAL_URL: http://localhost:4000
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: tuello
+      S3_SECRET_ACCESS_KEY: tuello-dev-secret
+      S3_FORCE_PATH_STYLE: 'true'
+      NODE_ENV: production
+      LOG_LEVEL: warn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - name: Start backing services
+        run: docker compose up -d --wait postgres pgbouncer valkey mailpit
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm db:migrate
+      - run: pnpm db:seed
+      - name: Start api, worker, web
+        run: |
+          PORT=4000 nohup node apps/api/dist/main.js > api.log 2>&1 &
+          nohup node apps/worker/dist/main.js > worker.log 2>&1 &
+          (cd apps/web && nohup npx next start -p 3000 > ../../web.log 2>&1 &)
+          npx --yes wait-on -t 60000 http://localhost:4000/readyz http://localhost:3000/healthz
+      - run: pnpm --filter @tuello/e2e exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - if: failure()
+        run: tail -n 200 api.log worker.log web.log
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7
+
+  docker:
+    name: Docker images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [api, worker, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: false
+          tags: tuello-${{ matrix.app }}:ci
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+
+  security:
+    name: Dependency and secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - name: Dependency audit (production dependencies, high and critical)
+        run: pnpm audit --prod --audit-level high
+      - name: Secret scan (gitleaks, open source CLI)
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0 detect --source /repo --redact --verbose --config /repo/.gitleaks.toml

@@ -8,6 +8,7 @@ import {
   type ProblemDetails,
 } from '@tuello/shared';
 import type { Response } from 'express';
+import { logPath } from './log-path';
 import { Problem } from './problem';
 import type { TuelloRequest } from './request';
 
@@ -77,7 +78,7 @@ export class ProblemFilter implements ExceptionFilter {
       code,
       ...(detail ? { detail } : {}),
       ...(errors ? { errors } : {}),
-      instance: req.originalUrl?.split('?')[0],
+      instance: req.originalUrl ? logPath(req.originalUrl) : undefined,
       requestId: req.id,
     };
     if (headers) for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);

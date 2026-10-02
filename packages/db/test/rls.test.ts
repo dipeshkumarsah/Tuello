@@ -315,6 +315,27 @@ describe('Prisma tenant extension', () => {
     expect(calls).toEqual(['yes']);
   });
 
+  it('never leaks context between pooled connections under concurrent mixed-tenant load', async () => {
+    const pooled = createDatabase({
+      url: `${tdb.appUrl}${tdb.appUrl.includes('?') ? '&' : '?'}connection_limit=4`,
+    });
+    let leaks = 0;
+    await Promise.all(
+      Array.from({ length: 200 }, (_, i) => {
+        const t = i % 2 ? A : B;
+        return pooled.withTenant({ tenantId: t.tenantId }, async (tx) => {
+          const rows = await tx.membership.findMany({ select: { tenantId: true } });
+          const [s] = await tx.$queryRaw<
+            Array<{ t: string }>
+          >`SELECT current_setting('app.tenant_id', true) AS t`;
+          if (rows.some((r) => r.tenantId !== t.tenantId) || s?.t !== t.tenantId) leaks += 1;
+        });
+      }),
+    );
+    await pooled.disconnect();
+    expect(leaks).toBe(0);
+  });
+
   it('rejects non-UUID tenant ids', async () => {
     await expect(db.withTenant({ tenantId: "x' OR 1=1" }, async () => 1)).rejects.toThrow(/UUID/);
   });
@@ -459,5 +480,46 @@ describe('schema guard rails (catch tables added without isolation)', () => {
       if (INDEX_EXCEPTIONS.has(row.indexname) || row.indexname.endsWith('_pkey')) continue;
       expect([row.indexname, row.first_col]).toEqual([row.indexname, 'tenant_id']);
     }
+  });
+});
+
+describe('schema.prisma matches the migrated database', () => {
+  // Objects Prisma cannot model; they live only in SQL migrations.
+  const SQL_ONLY_INDEXES = [
+    'memberships_tenant_id_user_id_live_key',
+    'feature_flags_tenant_id_key_key',
+    'tenant_domains_hostname_live_key',
+    'tenant_domains_pending_check_idx',
+    'outbox_events_unpublished_idx',
+    'sessions_tenant_id_expires_at_idx',
+    'auth_tokens_tenant_id_expires_at_idx',
+  ];
+
+  it('has no drift beyond SQL-only indexes', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const path = await import('node:path');
+    const out = execFileSync(
+      process.execPath,
+      [
+        require.resolve('prisma/build/index.js'),
+        'migrate',
+        'diff',
+        '--from-url',
+        tdb.adminUrl,
+        '--to-schema-datamodel',
+        'prisma/schema.prisma',
+        '--script',
+      ],
+      {
+        cwd: path.resolve(__dirname, '..'),
+        env: { ...process.env, DATABASE_URL: tdb.adminUrl, DIRECT_DATABASE_URL: tdb.adminUrl },
+      },
+    ).toString();
+    const statements = out
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('--'))
+      .filter((l) => !SQL_ONLY_INDEXES.some((i) => l === `DROP INDEX "${i}";`));
+    expect(statements).toEqual([]);
   });
 });

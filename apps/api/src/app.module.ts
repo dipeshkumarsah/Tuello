@@ -6,6 +6,7 @@ import type { IncomingMessage } from 'node:http';
 import { loadEnv } from './config/env';
 import { AuthGuard } from './common/auth.guard';
 import { CsrfGuard } from './common/csrf.guard';
+import { logPath } from './common/log-path';
 import { ProblemFilter } from './common/problem.filter';
 import { RateLimitGuard } from './common/rate-limit.guard';
 import type { TuelloRequest } from './common/request';
@@ -55,11 +56,11 @@ const env = loadEnv();
           return { tenantId: r.tenant?.id, userId: r.auth?.userId };
         },
         serializers: {
-          // Drop query strings: links can carry one-time tokens.
+          // Never log one-time tokens (query strings, /token/{token} segments).
           req: (req: { id: string; method: string; url: string }) => ({
             id: req.id,
             method: req.method,
-            path: req.url.split('?')[0],
+            path: logPath(req.url),
           }),
         },
         autoLogging: {

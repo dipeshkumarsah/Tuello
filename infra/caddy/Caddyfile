@@ -1,0 +1,38 @@
+# Production reverse proxy (Caddy, open source). Coolify can run this, or use its built-in proxy
+# with the same routing rules.
+#
+# - *.tuello.app and app.tuello.app: certificates on demand (or a DNS-01 wildcard).
+# - Tenant custom domains: certificates on demand, ONLY when the API's ask endpoint says the
+#   hostname is a verified tenant domain (tenant_domains.status = 'verified').
+# - /api/* goes straight to the API (the web app's /api proxy is the fallback in development).
+{
+	email {$ACME_EMAIL}
+	on_demand_tls {
+		ask http://api:4000/v1/internal/tls/ask
+	}
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+
+	# Never expose internal endpoints publicly.
+	@internal path /v1/internal/* /api/v1/internal/*
+	respond @internal 404
+
+	handle_path /api/* {
+		reverse_proxy api:4000 {
+			header_up X-Forwarded-Host {host}
+		}
+	}
+	handle {
+		reverse_proxy web:3000 {
+			header_up X-Forwarded-Host {host}
+		}
+	}
+}
