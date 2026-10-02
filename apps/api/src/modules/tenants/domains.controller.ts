@@ -27,7 +27,7 @@ import { Problem } from '../../common/problem';
 import type { TuelloRequest } from '../../common/request';
 import { ApiZodBody, ZBody } from '../../common/zod';
 import { QueueService } from '../../infra/queue.service';
-import { TlsProvisioner } from '../../infra/tls-provisioner';
+import { TlsProvisioner } from '@tuello/shared';
 import { DB } from '../../infra/tokens';
 import { AuditService, EventsService } from '../events/events.service';
 import { TenantDirectory } from './tenant-directory.service';

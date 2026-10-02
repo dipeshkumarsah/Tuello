@@ -109,3 +109,44 @@ describe('host scope', () => {
     expect(res.body.code).toBe('not_found');
   });
 });
+
+describe('dead-letter jobs', () => {
+  it('lists and retries only the current tenant’s failed jobs', async () => {
+    const { Queue } = await import('bullmq');
+    const a = await signupTenant(h);
+    const b = await signupTenant(h);
+    const dlq = new Queue('dead-letter', { connection: h.redis });
+    const add = async (tenantId: string, id: string) => {
+      await dlq.add(
+        'verify_email',
+        {
+          tenantId,
+          originalQueue: 'email',
+          originalJobId: id,
+          name: 'verify_email',
+          data: { tenantId, to: 'x@example.com', template: 'verify_email', locale: 'en', vars: {} },
+          failedReason: 'SMTP down',
+          attemptsMade: 8,
+          failedAt: new Date().toISOString(),
+        },
+        { jobId: `email-${id}` },
+      );
+      await h.redis.zadd(`dlq:tenant:${tenantId}`, Date.now(), `email-${id}`);
+    };
+    await add(a.tenantId, 'a1');
+    await add(b.tenantId, 'b1');
+
+    const list = await a.owner.get('/v1/jobs/dead-letter');
+    expect(list.body.items.map((j: { id: string }) => j.id)).toEqual(['email-a1']);
+    expect(list.body.items[0]).toMatchObject({
+      queue: 'email',
+      failedReason: 'SMTP down',
+      attemptsMade: 8,
+    });
+    expect((await a.owner.post('/v1/jobs/dead-letter/email-b1/retry')).status).toBe(404);
+    expect((await a.owner.post('/v1/jobs/dead-letter/email-a1/retry')).status).toBe(202);
+    expect((await a.owner.get('/v1/jobs/dead-letter')).body.items).toEqual([]);
+    expect((await b.owner.get('/v1/jobs/dead-letter')).body.items).toHaveLength(1);
+    await dlq.close();
+  });
+});

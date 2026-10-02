@@ -5,7 +5,7 @@ import { ENV, loadEnv, type Env } from '../config/env';
 import { BotCheckService } from './bot-check.service';
 import { QueueService } from './queue.service';
 import { StorageService } from './storage.service';
-import { TlsProvisioner, createTlsProvisioner } from './tls-provisioner';
+import { createTlsProvisioner, TlsProvisioner } from '@tuello/shared';
 import { DB, REDIS } from './tokens';
 
 @Global()

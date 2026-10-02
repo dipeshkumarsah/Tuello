@@ -1,7 +1,5 @@
-import type { Env } from '../config/env';
-
 /**
- * Certificate issuance for verified tenant custom domains, behind one interface.
+ * Server-side only (api, worker). Certificate issuance for verified tenant custom domains, behind one interface.
  *
  * - caddy-on-demand: Caddy issues certificates on the first TLS handshake and asks
  *   GET /v1/internal/tls/ask?domain=... first; that endpoint only says yes for verified
@@ -24,6 +22,8 @@ class PassiveProvisioner extends TlsProvisioner {
   async revokeHost(): Promise<void> {}
 }
 
-export function createTlsProvisioner(env: Pick<Env, 'TLS_PROVISIONER'>): TlsProvisioner {
+export function createTlsProvisioner(env: {
+  TLS_PROVISIONER: 'caddy-on-demand' | 'noop';
+}): TlsProvisioner {
   return new PassiveProvisioner(env.TLS_PROVISIONER);
 }
