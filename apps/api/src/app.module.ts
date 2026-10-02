@@ -19,6 +19,9 @@ import { IdentityModule } from './modules/identity/identity.module';
 import { MembersModule } from './modules/members/members.module';
 import { OpsModule } from './modules/ops/ops.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { CrmModule } from './modules/crm/crm.module';
+import { DataModule } from './modules/data/data.module';
+import { PricingModule } from './modules/pricing/pricing.module';
 
 /** Never written to logs, wherever they appear. */
 export const LOG_REDACT = [
@@ -77,6 +80,9 @@ const env = loadEnv();
     TenantsModule,
     MembersModule,
     OpsModule,
+    PricingModule,
+    CrmModule,
+    DataModule,
   ],
   providers: [
     // Order matters: rate limit, then CSRF, then authentication + permission matrix.

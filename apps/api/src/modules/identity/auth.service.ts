@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   burnPasswordCheck,
+  ensureTenantDefaults,
   hashPassword,
   passwordNeedsRehash,
   Prisma,
@@ -77,6 +78,7 @@ export class AuthService {
           },
         });
         await tx.tenantBranding.create({ data: { tenantId, emailSenderName: input.companyName } });
+        await ensureTenantDefaults(tx, tenantId, input.measurementUnit);
         await tx.user.create({
           data: { id: userId, email: input.email, name: input.name, passwordHash },
         });

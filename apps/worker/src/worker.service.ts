@@ -8,6 +8,8 @@ import type { Database } from '@tuello/db';
 import {
   createTlsProvisioner,
   QUEUES,
+  type ExportJobData,
+  type ImportJobData,
   type SendEmailJob,
   type VerifyDomainJob,
 } from '@tuello/shared';
@@ -21,6 +23,8 @@ import { Storage } from './infra/storage';
 import { DomainProcessor } from './jobs/domain.processor';
 import { EmailProcessor } from './jobs/email.processor';
 import { EventsProcessor } from './jobs/events.processor';
+import { ExportProcessor } from './jobs/export.processor';
+import { ImportProcessor } from './jobs/import.processor';
 import { OutboxPublisher } from './jobs/outbox.publisher';
 
 /** Starts every consumer, the outbox relay, the domain scan schedule, and a health endpoint. */
@@ -47,14 +51,8 @@ export class WorkerService implements OnApplicationBootstrap, OnApplicationShutd
     const redis = this.runner.connection();
     const c = this.env.WORKER_CONCURRENCY;
 
-    const email = new EmailProcessor(
-      this.db,
-      redis,
-      this.mailer,
-      new Storage(this.env),
-      this.env,
-      this.log,
-    );
+    const storage = new Storage(this.env);
+    const email = new EmailProcessor(this.db, redis, this.mailer, storage, this.env, this.log);
     this.runner.run<SendEmailJob>(QUEUES.email, email.process, c);
 
     const domains = new DomainProcessor(
@@ -78,6 +76,18 @@ export class WorkerService implements OnApplicationBootstrap, OnApplicationShutd
     );
 
     this.runner.run(QUEUES.events, this.events.process, c);
+
+    // Imports and exports are long; low concurrency keeps the database free for the API.
+    this.runner.run<ImportJobData>(
+      QUEUES.imports,
+      new ImportProcessor(this.db, storage, this.log).process,
+      2,
+    );
+    this.runner.run<ExportJobData>(
+      QUEUES.exports,
+      new ExportProcessor(this.db, storage, this.log).process,
+      2,
+    );
 
     this.outbox = new OutboxPublisher(
       this.db,

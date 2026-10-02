@@ -17,6 +17,7 @@ import { AuthService } from '../identity/auth.service';
 import { LinksService } from '../identity/links.service';
 import { BrandingService } from './branding.service';
 import { TenantDirectory } from './tenant-directory.service';
+import { PricingService } from '../pricing/pricing.service';
 
 export function toTenantDto(t: Tenant): TenantDto {
   return {
@@ -44,6 +45,7 @@ export class TenantController {
     private readonly directory: TenantDirectory,
     private readonly auth: AuthService,
     private readonly links: LinksService,
+    private readonly pricing: PricingService,
   ) {}
 
   /** What a sign-in page on this host needs: name and branding. Never exposes settings. */
@@ -106,6 +108,9 @@ export class TenantController {
         },
       );
     }
+
+    if (changed.some((k) => k === 'currency' || k === 'measurementUnit'))
+      this.pricing.invalidate(before.id);
 
     let handoffUrl: string | null = null;
     if (slugChanged) {

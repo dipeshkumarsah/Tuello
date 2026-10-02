@@ -1,4 +1,4 @@
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Inject, Injectable } from '@nestjs/common';
@@ -53,7 +53,40 @@ export class StorageService {
     });
   }
 
-  async signedGetUrl(key: string, expiresIn = 3600): Promise<string> {
+  /** Object size, or null if it does not exist. */
+  async head(key: string): Promise<number | null> {
+    try {
+      const r = await this.client.send(
+        new HeadObjectCommand({ Bucket: this.env.S3_BUCKET, Key: key }),
+      );
+      return r.ContentLength ?? 0;
+    } catch (err) {
+      const status = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+      if (status === 404 || (err as { name?: string }).name === 'NotFound') return null;
+      throw err;
+    }
+  }
+
+  /** The first `bytes` of an object (CSV previews); the API never reads whole uploads. */
+  async readHead(key: string, bytes: number): Promise<string> {
+    const r = await this.client.send(
+      new GetObjectCommand({ Bucket: this.env.S3_BUCKET, Key: key, Range: `bytes=0-${bytes - 1}` }),
+    );
+    return (await r.Body?.transformToString('utf8')) ?? '';
+  }
+
+  async signedGetUrl(key: string, expiresIn = 3600, downloadName?: string): Promise<string> {
+    if (downloadName) {
+      return getSignedUrl(
+        this.publicClient,
+        new GetObjectCommand({
+          Bucket: this.env.S3_BUCKET,
+          Key: key,
+          ResponseContentDisposition: `attachment; filename="${downloadName.replace(/[^\w.-]/g, '_')}"`,
+        }),
+        { expiresIn },
+      );
+    }
     return getSignedUrl(
       this.publicClient,
       new GetObjectCommand({ Bucket: this.env.S3_BUCKET, Key: key }),

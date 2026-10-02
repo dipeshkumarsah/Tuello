@@ -34,9 +34,10 @@ export async function startApp(): Promise<Harness> {
     TRUST_PROXY: 'true',
     ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     RATE_LIMIT_FACTOR: '1000',
-    S3_ENDPOINT: 'http://localhost:9000',
-    S3_ACCESS_KEY_ID: 'test',
-    S3_SECRET_ACCESS_KEY: 'test',
+    S3_ENDPOINT: inject('s3Endpoint'),
+    S3_ACCESS_KEY_ID: 'tuello',
+    S3_SECRET_ACCESS_KEY: 'tuello-dev-secret',
+    S3_BUCKET: 'tuello',
     S3_REGION: 'us-east-1',
     S3_FORCE_PATH_STYLE: 'true',
   });

@@ -4,6 +4,8 @@ import {
   DEFAULT_JOB_OPTIONS,
   QUEUES,
   type DeadLetterJob,
+  type ExportJobData,
+  type ImportJobData,
   type QueueName,
   type SendEmailJob,
   type VerifyDomainJob,
@@ -53,6 +55,24 @@ export class QueueService implements OnModuleDestroy {
     this.later(() =>
       this.queue(QUEUES.domains).add('verify-domain', job, {
         jobId: `verify-${job.domainId}-${Date.now()}`,
+      }),
+    );
+  }
+
+  enqueueImport(job: ImportJobData): void {
+    this.later(() =>
+      this.queue(QUEUES.imports).add('import', job, {
+        jobId: `import-${job.importId}`,
+        attempts: 3,
+      }),
+    );
+  }
+
+  enqueueExport(job: ExportJobData): void {
+    this.later(() =>
+      this.queue(QUEUES.exports).add('export', job, {
+        jobId: `export-${job.exportId}`,
+        attempts: 3,
       }),
     );
   }
