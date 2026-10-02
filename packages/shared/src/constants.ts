@@ -66,5 +66,10 @@ export const QUEUES = {
   events: 'events',
   domains: 'domains',
   deadLetter: 'dead-letter',
+  imports: 'imports',
+  exports: 'exports',
 } as const;
+
+export const IMPORT_MAX_BYTES = 50 * 1024 * 1024;
+export const IMPORT_BATCH_SIZE = 500;
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];

@@ -38,6 +38,18 @@ export const PERMISSION_MATRIX = {
   'jobs.read': ['owner', 'admin'],
   'jobs.retry': ['owner', 'admin'],
 
+  /** CRM: brokerages, clients, contacts, tags, notes, saved views, imports and exports. */
+  'clients.read': ['owner', 'admin', 'coordinator'],
+  'clients.manage': ['owner', 'admin', 'coordinator'],
+
+  /** Services, variants, packages, add-ons, skills. Includes base prices, so no shooter/editor. */
+  'catalog.read': ['owner', 'admin', 'coordinator'],
+  'catalog.manage': ['owner', 'admin'],
+
+  /** Size bands, price rules, price lists, travel fees, coupons, tax rates, quotes. */
+  'pricing.read': ['owner', 'admin', 'coordinator'],
+  'pricing.manage': ['owner', 'admin'],
+
   /** Tuello's own subscription billing (Stripe Billing). Owner only. Routes arrive in a later phase. */
   'subscription.manage': ['owner'],
 } as const satisfies Record<string, readonly Role[]>;

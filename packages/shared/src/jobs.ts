@@ -34,3 +34,18 @@ export const DEFAULT_JOB_OPTIONS = {
   removeOnComplete: { age: 3600, count: 1000 },
   removeOnFail: { age: 7 * 24 * 3600 },
 };
+
+export interface ImportJobData {
+  tenantId: string;
+  importId: string;
+  userId: string | null;
+}
+
+export type ExportEntity = 'clients' | 'brokerages' | 'services' | 'add_ons' | 'packages' | 'coupons';
+
+export interface ExportJobData {
+  tenantId: string;
+  exportId: string;
+  entity: ExportEntity;
+  filters: Record<string, unknown>;
+}
