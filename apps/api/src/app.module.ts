@@ -43,10 +43,16 @@ const env = loadEnv();
       pinoHttp: {
         level: env.LOG_LEVEL,
         redact: { paths: LOG_REDACT, censor: '[redacted]' },
-        genReqId: (req: IncomingMessage) => (req as TuelloRequest).id ?? randomUUID(),
+        // pino-http runs first and owns the id; RequestIdMiddleware echoes it in x-request-id.
+        genReqId: (req: IncomingMessage) => {
+          const incoming = req.headers['x-request-id'];
+          return typeof incoming === 'string' && /^[A-Za-z0-9._-]{8,100}$/.test(incoming)
+            ? incoming
+            : randomUUID();
+        },
         customProps: (req: IncomingMessage) => {
           const r = req as TuelloRequest;
-          return { requestId: r.id, tenantId: r.tenant?.id, userId: r.auth?.userId };
+          return { tenantId: r.tenant?.id, userId: r.auth?.userId };
         },
         serializers: {
           // Drop query strings: links can carry one-time tokens.

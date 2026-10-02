@@ -28,6 +28,16 @@ const TENANTS = [
   },
 ];
 
+const DEMO_NAMES: Record<Role, string> = {
+  owner: 'Olive Owner',
+  admin: 'Adam Admin',
+  coordinator: 'Cora Coordinator',
+  shooter: 'Sam Shooter',
+  editor: 'Edie Editor',
+  client: 'Clara Client',
+  brokerage_admin: 'Bree Broker',
+};
+
 async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is required');
@@ -65,7 +75,7 @@ async function main() {
           data: {
             id: userId,
             email,
-            name: `${t.name.split(' ')[0]} ${role.replace('_', ' ')}`,
+            name: DEMO_NAMES[role],
             passwordHash,
             emailVerifiedAt: new Date(),
           },

@@ -157,7 +157,7 @@ export const en = {
   'branding.uploadLogo': 'Upload logo',
   'branding.removeLogo': 'Remove logo',
   'branding.accent': 'Accent colour',
-  'branding.accentHint': 'Optional. Used on client pages for buttons and links.',
+  'branding.accentHint': 'Used on client pages and emails for buttons and links.',
   'branding.accentPreview': 'Preview',
   'branding.contrast': 'Contrast {ratio}:1',
   'branding.senderName': 'Email sender name',
@@ -176,6 +176,7 @@ export const en = {
   'team.inviteSent': 'Invite sent to {email}',
   'team.removeConfirm': 'Remove {name} from {company}? They lose access immediately.',
   'team.you': 'You',
+  'team.joined': 'Joined',
   'team.twoFactor': '2FA',
 
   'role.owner': 'Owner',

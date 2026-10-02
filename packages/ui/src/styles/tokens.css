@@ -1,0 +1,191 @@
+/*
+ * Tuello design tokens. Monochrome: black, white and the neutral scale. The only hue is one red
+ * for destructive actions and errors (value tuned per theme for >= 4.5:1 contrast).
+ * Components use these tokens through Tailwind utilities (bg-bg, text-fg, border-border, ...);
+ * no component hard-codes a colour.
+ *
+ * Usage in an app stylesheet (Tailwind v4):
+ *   @import 'tailwindcss';
+ *   @import '@tuello/ui/styles.css';
+ *   @source '../../../packages/ui/src';
+ */
+@import '@fontsource-variable/inter/index.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  color-scheme: light;
+  --tu-bg: #ffffff;
+  --tu-bg-subtle: #fafafa; /* neutral-50 */
+  --tu-bg-muted: #f5f5f5; /* neutral-100 */
+  --tu-bg-emphasis: #e5e5e5; /* neutral-200 */
+  --tu-fg: #000000;
+  --tu-fg-muted: #525252; /* neutral-600, 7.8:1 */
+  --tu-fg-subtle: #737373; /* neutral-500, 4.7:1 */
+  --tu-border: #e5e5e5; /* neutral-200 */
+  --tu-border-strong: #a3a3a3; /* neutral-400: 3:1 for input outlines */
+  --tu-primary: #000000;
+  --tu-primary-fg: #ffffff;
+  --tu-primary-hover: #262626; /* neutral-800 */
+  --tu-danger: #dc2626; /* 4.8:1 on white */
+  --tu-danger-fg: #ffffff;
+  --tu-danger-subtle: #fef2f2;
+  --tu-focus: #000000;
+  --tu-overlay: rgb(0 0 0 / 0.4);
+  /* Tenant accent for client-facing pages; falls back to primary. Set inline per tenant. */
+  --tu-accent: var(--tu-primary);
+  --tu-accent-fg: var(--tu-primary-fg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --tu-bg: #000000;
+    --tu-bg-subtle: #0a0a0a; /* neutral-950 */
+    --tu-bg-muted: #171717; /* neutral-900 */
+    --tu-bg-emphasis: #262626; /* neutral-800 */
+    --tu-fg: #ffffff;
+    --tu-fg-muted: #a3a3a3; /* neutral-400, 7.8:1 on 950 */
+    --tu-fg-subtle: #a3a3a3;
+    --tu-border: #262626;
+    --tu-border-strong: #737373;
+    --tu-primary: #ffffff;
+    --tu-primary-fg: #000000;
+    --tu-primary-hover: #e5e5e5;
+    --tu-danger: #f87171; /* 7:1 on black */
+    --tu-danger-fg: #000000;
+    --tu-danger-subtle: #1c0a0a;
+    --tu-focus: #ffffff;
+    --tu-overlay: rgb(0 0 0 / 0.7);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --tu-bg: #000000;
+  --tu-bg-subtle: #0a0a0a;
+  --tu-bg-muted: #171717;
+  --tu-bg-emphasis: #262626;
+  --tu-fg: #ffffff;
+  --tu-fg-muted: #a3a3a3;
+  --tu-fg-subtle: #a3a3a3;
+  --tu-border: #262626;
+  --tu-border-strong: #737373;
+  --tu-primary: #ffffff;
+  --tu-primary-fg: #000000;
+  --tu-primary-hover: #e5e5e5;
+  --tu-danger: #f87171;
+  --tu-danger-fg: #000000;
+  --tu-danger-subtle: #1c0a0a;
+  --tu-focus: #ffffff;
+  --tu-overlay: rgb(0 0 0 / 0.7);
+}
+
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-bg: var(--tu-bg);
+  --color-bg-subtle: var(--tu-bg-subtle);
+  --color-bg-muted: var(--tu-bg-muted);
+  --color-bg-emphasis: var(--tu-bg-emphasis);
+  --color-fg: var(--tu-fg);
+  --color-fg-muted: var(--tu-fg-muted);
+  --color-fg-subtle: var(--tu-fg-subtle);
+  --color-border: var(--tu-border);
+  --color-border-strong: var(--tu-border-strong);
+  --color-primary: var(--tu-primary);
+  --color-primary-fg: var(--tu-primary-fg);
+  --color-primary-hover: var(--tu-primary-hover);
+  --color-danger: var(--tu-danger);
+  --color-danger-fg: var(--tu-danger-fg);
+  --color-danger-subtle: var(--tu-danger-subtle);
+  --color-focus: var(--tu-focus);
+  --color-overlay: var(--tu-overlay);
+  --color-accent: var(--tu-accent);
+  --color-accent-fg: var(--tu-accent-fg);
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* Type scale: 12, 13, 14, 16, 20, 24, 32 */
+  --text-*: initial;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 20px;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
+  --text-md: 16px;
+  --text-md--line-height: 24px;
+  --text-lg: 20px;
+  --text-lg--line-height: 28px;
+  --text-xl: 24px;
+  --text-xl--line-height: 32px;
+  --text-2xl: 32px;
+  --text-2xl--line-height: 40px;
+
+  --font-weight-*: initial;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  --radius-*: initial;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-full: 9999px;
+
+  --shadow-*: initial;
+  --spacing: 4px;
+
+  --animate-in: tu-fade-in 120ms ease-out;
+}
+
+@keyframes tu-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    background: var(--tu-bg);
+    color: var(--tu-fg);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background: var(--tu-bg);
+    color: var(--tu-fg);
+    font-size: 14px;
+    line-height: 20px;
+  }
+  *,
+  ::before,
+  ::after {
+    border-color: var(--tu-border);
+  }
+  /* Always-visible 2px focus ring. */
+  :focus-visible {
+    outline: 2px solid var(--tu-focus);
+    outline-offset: 2px;
+  }
+  /* Motion stays under 150ms and is removed entirely on request. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
