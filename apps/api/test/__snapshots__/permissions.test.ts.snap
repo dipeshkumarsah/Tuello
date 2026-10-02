@@ -1,0 +1,33 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`route inventory > route -> permission table is reviewed (update the snapshot deliberately) 1`] = `
+[
+  "DELETE /v1/invites/{id} -> invites.manage",
+  "DELETE /v1/me/sessions/{id} -> self.manage",
+  "DELETE /v1/members/{id} -> members.manage",
+  "DELETE /v1/tenant/domains/{id} -> domains.manage",
+  "GET    /v1/audit-logs -> audit.read",
+  "GET    /v1/invites -> invites.read",
+  "GET    /v1/jobs/dead-letter -> jobs.read",
+  "GET    /v1/me -> self.manage",
+  "GET    /v1/me/sessions -> self.manage",
+  "GET    /v1/members -> members.read",
+  "GET    /v1/tenant -> tenant.read",
+  "GET    /v1/tenant/branding -> branding.read",
+  "GET    /v1/tenant/domains -> domains.read",
+  "PATCH  /v1/me -> self.manage",
+  "PATCH  /v1/members/{id} -> members.manage",
+  "PATCH  /v1/tenant -> tenant.update",
+  "PATCH  /v1/tenant/branding -> branding.update",
+  "POST   /v1/invites -> invites.manage",
+  "POST   /v1/jobs/dead-letter/{id}/retry -> jobs.retry",
+  "POST   /v1/me/password -> self.manage",
+  "POST   /v1/me/totp/confirm -> self.manage",
+  "POST   /v1/me/totp/disable -> self.manage",
+  "POST   /v1/me/totp/setup -> self.manage",
+  "POST   /v1/tenant/branding/logo-upload -> branding.update",
+  "POST   /v1/tenant/domains -> domains.manage",
+  "POST   /v1/tenant/domains/{id}/verify -> domains.manage",
+  "POST   /v1/tenant/onboarding/complete -> tenant.update",
+]
+`;

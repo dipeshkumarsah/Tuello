@@ -146,6 +146,7 @@ CREATE TABLE "users" (
     "name" TEXT NOT NULL,
     "password_hash" TEXT,
     "email_verified_at" TIMESTAMPTZ(6),
+    "password_changed_at" TIMESTAMPTZ(6),
     "totp_secret" TEXT,
     "totp_enabled_at" TIMESTAMPTZ(6),
     "locale" TEXT NOT NULL DEFAULT 'en',

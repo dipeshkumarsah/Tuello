@@ -4,6 +4,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { Client } from 'pg';
 
 /**
+ * Test-only helper (imported as '@tuello/db/dist/testing'; never from runtime code).
  * Starts PostgreSQL 16 in a container, creates the runtime role, and applies the real
  * migrations with `prisma migrate deploy`. Reused by api integration tests.
  */

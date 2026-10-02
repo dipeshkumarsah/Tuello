@@ -133,18 +133,20 @@ model TenantBranding {
 /// Global identity. One person may belong to several tenants through memberships.
 /// RLS: visible only to itself or to members of the current tenant.
 model User {
-  id              String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
-  email           String    @unique
-  name            String
-  passwordHash    String?   @map("password_hash")
-  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  id                String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  email             String    @unique
+  name              String
+  passwordHash      String?   @map("password_hash")
+  emailVerifiedAt   DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  /// Sessions created before this instant are invalid (password change or reset).
+  passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
   /// AES-256-GCM ciphertext (see apps/api crypto); never the raw secret.
-  totpSecret      String?   @map("totp_secret")
-  totpEnabledAt   DateTime? @map("totp_enabled_at") @db.Timestamptz(6)
-  locale          String    @default("en")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+  totpSecret        String?   @map("totp_secret")
+  totpEnabledAt     DateTime? @map("totp_enabled_at") @db.Timestamptz(6)
+  locale            String    @default("en")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   memberships Membership[]
   sessions    Session[]

@@ -14,7 +14,7 @@
     "generate": "prisma generate",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --dir src",
+    "test": "vitest run --dir src --exclude src/testing.ts",
     "test:integration": "vitest run --dir test",
     "migrate:deploy": "prisma migrate deploy",
     "migrate:status": "prisma migrate status",

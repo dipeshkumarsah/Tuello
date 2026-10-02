@@ -2,7 +2,7 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase, MissingTenantContextError, type Database } from '../src';
 import { createTenantFixture, type TenantFixture } from './fixtures';
-import { startTestDatabase, type TestDatabase } from './harness';
+import { startTestDatabase, type TestDatabase } from '../src/testing';
 
 /**
  * Tenant isolation proofs. Every assertion runs as tuello_app (NOSUPERUSER NOBYPASSRLS) with
