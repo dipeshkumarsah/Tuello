@@ -102,3 +102,46 @@ high-severity advisories. Remove each when the parent package ships the fix.
 
 Images avoid `apk` at build time. Node handles SIGTERM through Nest shutdown hooks; Compose and
 Coolify can add `init: true` if wanted.
+
+### Client price lists: per-item overrides plus a default discount (option A)
+
+A price list holds, per catalog item, either a fixed price (replaces size-band pricing) or a
+percentage off, plus one default percentage for everything else, and can waive travel. Lists
+are assigned to clients or brokerages; the client's list wins. Chosen over full per-client
+price grids, which multiply the data to maintain for little gain.
+
+### Composite tenant foreign keys
+
+Every reference between tenant-owned rows is `(tenant_id, x_id) → parent(tenant_id, id)`, backed
+by a unique index on `(tenant_id, id)`. RLS already hides other tenants' rows; this makes a
+cross-tenant link impossible to store at all.
+
+### Search results are capped, not paginated
+
+Ranked search returns the best matches (up to the requested limit) with no cursor; a stable
+cursor over a similarity ranking is costly and rarely useful. Browsing without a query uses
+keyset pagination.
+
+### SeaweedFS for integration tests
+
+Testcontainers starts SeaweedFS (Apache 2.0) as the S3 server for API and worker tests:
+small, starts fast, supports presigned POST once credentials are configured. Development and
+e2e keep MinIO; production uses R2. All three go through the same S3 API.
+
+### Import progress bypasses the outbox
+
+The worker updates `import_jobs` counters directly after each batch. Progress is not a domain
+event; start and finish still emit `import.*` events through the outbox.
+
+### Append-only coupon redemptions and activity
+
+`coupon_redemptions` and `client_activities` grant the runtime role INSERT and SELECT only.
+Merging clients never rewrites history: the merged client keeps its rows and points at the
+winner (`merged_into_id`), and the winner's timeline reads its own activity plus that of every
+client merged into it. Redemptions are written when orders exist
+(Phase 3).
+
+### Pricing snapshot cache is versioned
+
+The Valkey key carries a version number, bumped when the snapshot's shape or ordering changes,
+so a deploy never serves an old snapshot for up to its 10-minute TTL.

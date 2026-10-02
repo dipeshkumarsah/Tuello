@@ -82,6 +82,41 @@ Modules talk through exported services and domain events, never through each oth
   worker checks with backoff; once verified the host cache is invalidated and Caddy's on-demand
   TLS `ask` endpoint starts answering yes for it.
 
+## CRM, catalog and pricing
+
+- **Search.** `clients.search_text` and `search_vector` are generated columns (names, emails,
+  phones, company). A query matches by substring (`LIKE`, trigram index), word prefix (full
+  text, `simple` config), word similarity (`<%`, catches typos), phone digits, or the
+  brokerage's name. Results are ranked (name prefix, email prefix, similarity) and capped;
+  plain lists use keyset pagination on `(sort_name, id)`.
+- **Composite tenant foreign keys.** Child rows reference `(tenant_id, parent_id)`, so even a
+  bug that skipped RLS could not link a row to another tenant's parent.
+- **Pricing engine** (`packages/shared/src/pricing`) is one pure function, `quote()`. Integer
+  minor units, basis points, half-up rounding, no I/O. Order of operations: standard price
+  (size band + type > band > type > base) → client price list (fixed price replaces, percent
+  reduces) → coupon on the item subtotal (allocated across lines by largest remainder) →
+  travel fee (first matching rule: territory flat fee, or distance with free km, per km,
+  min/max) → tax per matching region rate, rounded once per rate.
+- The API builds a **catalog snapshot** per tenant (`GET /v1/pricing/catalog`, cached in Valkey,
+  invalidated on every catalog or pricing write) and calls `quote()` on it in
+  `POST /v1/quotes`. The web app calls the same `quote()` on the same snapshot, so the
+  price-list editor's live preview is exactly what the API charges.
+- Price list resolution: an explicit list, else the client's, else the client's brokerage's.
+
+## CSV import and export
+
+- Import: the browser uploads straight to object storage with a presigned POST (50 MB max).
+  The API previews the first 256 KB (headers, suggested mapping, sample rows with validation),
+  then queues the job. The worker streams the file through `csv-parse`, in batches of 500, one
+  transaction per batch (retried row by row if the batch fails). Rows match existing records by
+  external ID, then email, then name + phone, so importing the same file twice changes
+  nothing. Bad rows go to an error report CSV next to the upload. Progress is written to the
+  `import_jobs` row directly (not through the outbox) so the UI can poll it.
+- Imports and exports run on their own queues with concurrency 2, so a large file never
+  starves the API's database connections.
+- Export: a job streams rows to `{tenant}/exports/{id}.csv` with a multipart upload; the user
+  gets a short-lived signed download link. Money columns are in major units.
+
 ## Web app
 
 - One Next.js app serves every host. Middleware rewrites by host: apex → `/apex/*`, tenant →
