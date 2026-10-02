@@ -46,7 +46,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build --filter "./packages/*"
       # RLS proofs, schema drift, API (Supertest) and worker suites against real PostgreSQL 16,
-      # Valkey and Mailpit containers.
+      # Valkey, Mailpit and SeaweedFS (S3) containers.
       - run: pnpm test:integration
 
   e2e:
@@ -77,7 +77,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
       - name: Start backing services
-        run: docker compose up -d --wait postgres pgbouncer valkey mailpit
+        run: |
+          docker compose up -d --wait postgres pgbouncer valkey mailpit minio
+          docker compose run --rm minio-init
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm db:migrate

@@ -23,7 +23,14 @@
     "test:integration": {
       "dependsOn": ["^build"],
       "cache": false,
-      "passThroughEnv": ["TESTCONTAINERS_*", "DOCKER_HOST", "PG_TEST_IMAGE", "VALKEY_TEST_IMAGE"]
+      "passThroughEnv": [
+        "TESTCONTAINERS_*",
+        "DOCKER_HOST",
+        "PG_TEST_IMAGE",
+        "VALKEY_TEST_IMAGE",
+        "MAILPIT_TEST_IMAGE",
+        "S3_TEST_IMAGE"
+      ]
     }
   }
 }
