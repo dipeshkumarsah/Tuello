@@ -17,6 +17,8 @@ import { DB, REDIS } from '../../infra/tokens';
 import { AuditService, EventsService } from '../events/events.service';
 
 const CACHE_TTL = 600;
+/** Bump when the snapshot's shape or ordering changes, so a deploy never serves an old snapshot. */
+const CACHE_VERSION = 2;
 
 export interface QuoteResponse extends QuoteResult {
   context: {
@@ -41,7 +43,7 @@ export class PricingService {
   ) {}
 
   private key(tenantId: string) {
-    return `pricing:catalog:${tenantId}`;
+    return `pricing:catalog:v${CACHE_VERSION}:${tenantId}`;
   }
 
   /** Call inside the write transaction; the cache is dropped after commit. */
@@ -85,7 +87,11 @@ export class PricingService {
         tx.serviceVariant.findMany({
           where: { deletedAt: null, service: { deletedAt: null } },
           include: { service: true },
-          orderBy: [{ sortOrder: 'asc' }],
+          orderBy: [
+            { service: { sortOrder: 'asc' } },
+            { service: { name: 'asc' } },
+            { sortOrder: 'asc' },
+          ],
         }),
         tx.package.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
         tx.addOn.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
