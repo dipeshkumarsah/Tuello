@@ -24,3 +24,4 @@ export type {
 } from '@prisma/client';
 export { uuidv7 } from './uuid';
 export * from './password';
+export * from './defaults';

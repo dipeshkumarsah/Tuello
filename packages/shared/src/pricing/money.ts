@@ -8,11 +8,15 @@ export class PricingInputError extends Error {
 }
 
 export function assertMoney(value: number, what: string): void {
-  if (!Number.isSafeInteger(value) || value < 0) throw new PricingInputError(`${what} must be a non-negative integer (minor units), got ${value}`);
+  if (!Number.isSafeInteger(value) || value < 0)
+    throw new PricingInputError(
+      `${what} must be a non-negative integer (minor units), got ${value}`,
+    );
 }
 
 export function assertBps(value: number, what: string): void {
-  if (!Number.isInteger(value) || value < 0 || value > 10_000) throw new PricingInputError(`${what} must be 0..10000 basis points, got ${value}`);
+  if (!Number.isInteger(value) || value < 0 || value > 10_000)
+    throw new PricingInputError(`${what} must be 0..10000 basis points, got ${value}`);
 }
 
 /** amount * bps / 10000, rounded half up (amount >= 0). */
@@ -35,7 +39,9 @@ export function allocate(total: number, weights: number[]): number[] {
   const raw = weights.map((w) => (total * w) / sum);
   const parts = raw.map(Math.floor);
   let rest = total - parts.reduce((a, b) => a + b, 0);
-  const order = raw.map((r, i) => ({ i, frac: r - Math.floor(r) })).sort((a, b) => b.frac - a.frac || a.i - b.i);
+  const order = raw
+    .map((r, i) => ({ i, frac: r - Math.floor(r) }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i);
   for (const { i } of order) {
     if (rest <= 0) break;
     parts[i]! += 1;

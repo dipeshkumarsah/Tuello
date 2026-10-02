@@ -41,7 +41,8 @@ export interface ImportJobData {
   userId: string | null;
 }
 
-export type ExportEntity = 'clients' | 'brokerages' | 'services' | 'add_ons' | 'packages' | 'coupons';
+export type ExportEntity =
+  'clients' | 'brokerages' | 'services' | 'add_ons' | 'packages' | 'coupons';
 
 export interface ExportJobData {
   tenantId: string;

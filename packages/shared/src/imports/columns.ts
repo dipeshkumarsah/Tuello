@@ -16,23 +16,56 @@ export interface ImportField {
 
 export const IMPORT_FIELDS: Record<ImportEntity, ImportField[]> = {
   clients: [
-    { key: 'firstName', label: 'First name', aliases: ['first name', 'firstname', 'first', 'given name'] },
-    { key: 'lastName', label: 'Last name', aliases: ['last name', 'lastname', 'last', 'surname', 'family name'] },
-    { key: 'fullName', label: 'Full name', aliases: ['name', 'full name', 'agent', 'agent name', 'client', 'client name'] },
+    {
+      key: 'firstName',
+      label: 'First name',
+      aliases: ['first name', 'firstname', 'first', 'given name'],
+    },
+    {
+      key: 'lastName',
+      label: 'Last name',
+      aliases: ['last name', 'lastname', 'last', 'surname', 'family name'],
+    },
+    {
+      key: 'fullName',
+      label: 'Full name',
+      aliases: ['name', 'full name', 'agent', 'agent name', 'client', 'client name'],
+    },
     { key: 'email', label: 'Email', aliases: ['email', 'e-mail', 'email address', 'mail'] },
-    { key: 'phone', label: 'Phone', aliases: ['phone', 'mobile', 'cell', 'phone number', 'telephone'] },
+    {
+      key: 'phone',
+      label: 'Phone',
+      aliases: ['phone', 'mobile', 'cell', 'phone number', 'telephone'],
+    },
     { key: 'company', label: 'Company / team', aliases: ['company', 'team'] },
     { key: 'title', label: 'Title', aliases: ['title', 'position', 'job title'] },
     { key: 'brokerage', label: 'Brokerage', aliases: ['brokerage', 'broker', 'office', 'agency'] },
-    { key: 'externalRef', label: 'External ID', aliases: ['id', 'external id', 'external_id', 'crm id', 'reference'] },
+    {
+      key: 'externalRef',
+      label: 'External ID',
+      aliases: ['id', 'external id', 'external_id', 'crm id', 'reference'],
+    },
     { key: 'tags', label: 'Tags (comma separated)', aliases: ['tags', 'tag', 'labels'] },
-    { key: 'addressLine1', label: 'Address', aliases: ['address', 'address 1', 'address line 1', 'street'] },
+    {
+      key: 'addressLine1',
+      label: 'Address',
+      aliases: ['address', 'address 1', 'address line 1', 'street'],
+    },
     { key: 'city', label: 'City', aliases: ['city', 'town'] },
     { key: 'region', label: 'State / region', aliases: ['state', 'region', 'province', 'county'] },
-    { key: 'postalCode', label: 'Postal code', aliases: ['zip', 'zip code', 'postal code', 'postcode'] },
+    {
+      key: 'postalCode',
+      label: 'Postal code',
+      aliases: ['zip', 'zip code', 'postal code', 'postcode'],
+    },
   ],
   brokerages: [
-    { key: 'name', label: 'Name', required: true, aliases: ['name', 'brokerage', 'brokerage name', 'office', 'company'] },
+    {
+      key: 'name',
+      label: 'Name',
+      required: true,
+      aliases: ['name', 'brokerage', 'brokerage name', 'office', 'company'],
+    },
     { key: 'email', label: 'Email', aliases: ['email', 'e-mail'] },
     { key: 'phone', label: 'Phone', aliases: ['phone', 'telephone'] },
     { key: 'website', label: 'Website', aliases: ['website', 'web', 'url'] },
@@ -49,13 +82,19 @@ export type ImportMapping = Record<string, string>;
 
 export const importMappingSchema = z.record(z.string().max(40), z.string().max(200));
 
-const norm = (s: string) => s.trim().toLowerCase().replace(/[_\s]+/g, ' ');
+const norm = (s: string) =>
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, ' ');
 
 export function suggestMapping(entity: ImportEntity, headers: string[]): ImportMapping {
   const mapping: ImportMapping = {};
   const used = new Set<string>();
   for (const field of IMPORT_FIELDS[entity]) {
-    const header = headers.find((h) => !used.has(h) && (norm(h) === norm(field.label) || field.aliases.includes(norm(h))));
+    const header = headers.find(
+      (h) => !used.has(h) && (norm(h) === norm(field.label) || field.aliases.includes(norm(h))),
+    );
     if (header) {
       mapping[field.key] = header;
       used.add(header);
@@ -102,15 +141,31 @@ const clean = (v: string | undefined, max: number): string | null => {
   return t ? t.slice(0, max) : null;
 };
 
-function pick(raw: Record<string, string>, mapping: ImportMapping, key: string): string | undefined {
+function pick(
+  raw: Record<string, string>,
+  mapping: ImportMapping,
+  key: string,
+): string | undefined {
   const header = mapping[key];
   return header ? raw[header] : undefined;
 }
 
 /** Validates and normalises one CSV row for the given entity. Same rules in preview and worker. */
-export function parseImportRow(entity: 'clients', raw: Record<string, string>, mapping: ImportMapping): RowResult<ClientImportRow>;
-export function parseImportRow(entity: 'brokerages', raw: Record<string, string>, mapping: ImportMapping): RowResult<BrokerageImportRow>;
-export function parseImportRow(entity: ImportEntity, raw: Record<string, string>, mapping: ImportMapping): RowResult<ClientImportRow | BrokerageImportRow> {
+export function parseImportRow(
+  entity: 'clients',
+  raw: Record<string, string>,
+  mapping: ImportMapping,
+): RowResult<ClientImportRow>;
+export function parseImportRow(
+  entity: 'brokerages',
+  raw: Record<string, string>,
+  mapping: ImportMapping,
+): RowResult<BrokerageImportRow>;
+export function parseImportRow(
+  entity: ImportEntity,
+  raw: Record<string, string>,
+  mapping: ImportMapping,
+): RowResult<ClientImportRow | BrokerageImportRow> {
   const errors: string[] = [];
   const get = (k: string, max = 200) => clean(pick(raw, mapping, k), max);
 
@@ -155,7 +210,9 @@ export function parseImportRow(entity: ImportEntity, raw: Record<string, string>
   const externalRef = get('externalRef', 100);
   if (!firstName && !lastName && !email) errors.push('A name or an email is required');
   if (!email && !externalRef && !(phoneNormalized && (firstName || lastName))) {
-    errors.push('Each row needs an email, an external ID, or a name with a phone number (used to avoid duplicates)');
+    errors.push(
+      'Each row needs an email, an external ID, or a name with a phone number (used to avoid duplicates)',
+    );
   }
   if (errors.length) return { ok: false, errors };
   const tags = (get('tags', 1000) ?? '')
@@ -188,7 +245,11 @@ export function parseImportRow(entity: ImportEntity, raw: Record<string, string>
 export const createImportSchema = z.object({
   entity: z.enum(IMPORT_ENTITIES),
   fileName: z.string().trim().min(1).max(200),
-  size: z.number().int().positive().max(50 * 1024 * 1024),
+  size: z
+    .number()
+    .int()
+    .positive()
+    .max(50 * 1024 * 1024),
 });
 
 export const startImportSchema = z.object({ mapping: importMappingSchema });

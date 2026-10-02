@@ -93,6 +93,33 @@ model Tenant {
   outboxEvents OutboxEvent[]
   featureFlags FeatureFlag[]
 
+  brokerages           Brokerage[]
+  clients              Client[]
+  clientContacts       ClientContact[]
+  tags                 Tag[]
+  clientTags           ClientTag[]
+  notes                Note[]
+  clientActivities     ClientActivity[]
+  savedViews           SavedView[]
+  importJobs           ImportJob[]
+  exportJobs           ExportJob[]
+  skills               Skill[]
+  services             Service[]
+  serviceVariants      ServiceVariant[]
+  packages             Package[]
+  packageItems         PackageItem[]
+  addOns               AddOn[]
+  propertyTypes        PropertyType[]
+  sizeBands            SizeBand[]
+  priceRules           PriceRule[]
+  clientPriceLists     ClientPriceList[]
+  clientPriceListItems ClientPriceListItem[]
+  territories          Territory[]
+  travelFeeRules       TravelFeeRule[]
+  coupons              Coupon[]
+  couponRedemptions    CouponRedemption[]
+  taxRates             TaxRate[]
+
   @@map("tenants")
 }
 
@@ -151,8 +178,13 @@ model User {
   memberships Membership[]
   sessions    Session[]
   authTokens  AuthToken[]
-  invitesSent Invite[]     @relation("InvitedBy")
+  invitesSent Invite[]         @relation("InvitedBy")
   auditLogs   AuditLog[]
+  notes       Note[]
+  activities  ClientActivity[]
+  savedViews  SavedView[]
+  importJobs  ImportJob[]
+  exportJobs  ExportJob[]
 
   @@map("users")
 }
@@ -304,4 +336,641 @@ model FeatureFlag {
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   @@map("feature_flags")
+}
+
+// =============================================================================================
+// Phase 2: CRM
+// =============================================================================================
+
+enum ClientStatus {
+  active
+  archived
+
+  @@map("client_status")
+}
+
+enum SavedViewEntity {
+  clients
+  brokerages
+
+  @@map("saved_view_entity")
+}
+
+enum ImportEntity {
+  clients
+  brokerages
+
+  @@map("import_entity")
+}
+
+enum ImportStatus {
+  awaiting_upload
+  uploaded
+  queued
+  running
+  completed
+  failed
+
+  @@map("import_status")
+}
+
+enum ExportStatus {
+  queued
+  running
+  completed
+  failed
+
+  @@map("export_status")
+}
+
+model Brokerage {
+  id           String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  name         String
+  email        String?
+  phone        String?
+  website      String?
+  externalRef  String?   @map("external_ref")
+  priceListId  String?   @map("price_list_id") @db.Uuid
+  addressLine1 String?   @map("address_line1")
+  addressLine2 String?   @map("address_line2")
+  city         String?
+  region       String?
+  postalCode   String?   @map("postal_code")
+  country      String?   @db.Char(2)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  priceList ClientPriceList? @relation(fields: [priceListId], references: [id], onDelete: Restrict)
+  clients   Client[]
+  notes     Note[]
+
+  @@index([tenantId, name])
+  @@index([tenantId, createdAt])
+  @@map("brokerages")
+}
+
+/// A real estate agent (the media company's customer).
+model Client {
+  id              String       @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId        String       @map("tenant_id") @db.Uuid
+  brokerageId     String?      @map("brokerage_id") @db.Uuid
+  firstName       String       @default("") @map("first_name")
+  lastName        String       @default("") @map("last_name")
+  /// lower("last first email"), maintained by the API for keyset pagination by name.
+  sortName        String       @map("sort_name")
+  email           String?
+  phone           String?
+  phoneNormalized String?      @map("phone_normalized")
+  company         String?
+  title           String?
+  status          ClientStatus @default(active)
+  externalRef     String?      @map("external_ref")
+  priceListId     String?      @map("price_list_id") @db.Uuid
+  addressLine1    String?      @map("address_line1")
+  addressLine2    String?      @map("address_line2")
+  city            String?
+  region          String?
+  postalCode      String?      @map("postal_code")
+  country         String?      @db.Char(2)
+  mergedIntoId    String?      @map("merged_into_id") @db.Uuid
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?    @map("deleted_at") @db.Timestamptz(6)
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  brokerage         Brokerage?         @relation(fields: [brokerageId], references: [id], onDelete: Restrict)
+  priceList         ClientPriceList?   @relation(fields: [priceListId], references: [id], onDelete: Restrict)
+  mergedInto        Client?            @relation("ClientMerge", fields: [mergedIntoId], references: [id], onDelete: Restrict)
+  mergedFrom        Client[]           @relation("ClientMerge")
+  contacts          ClientContact[]
+  tags              ClientTag[]
+  notes             Note[]
+  activities        ClientActivity[]
+  couponRedemptions CouponRedemption[]
+
+  @@index([tenantId, sortName, id])
+  @@index([tenantId, createdAt, id])
+  @@index([tenantId, brokerageId])
+  @@index([tenantId, phoneNormalized])
+  @@index([tenantId, priceListId])
+  @@map("clients")
+}
+
+model ClientContact {
+  id        String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  clientId  String    @map("client_id") @db.Uuid
+  name      String
+  role      String?
+  email     String?
+  phone     String?
+  notify    Boolean   @default(false)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([tenantId, clientId])
+  @@map("client_contacts")
+}
+
+model Tag {
+  id        String   @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant  Tenant      @relation(fields: [tenantId], references: [id])
+  clients ClientTag[]
+
+  @@map("tags")
+}
+
+model ClientTag {
+  tenantId  String   @map("tenant_id") @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  tagId     String   @map("tag_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+  tag    Tag    @relation(fields: [tagId], references: [id])
+
+  @@id([tenantId, clientId, tagId])
+  @@index([tenantId, tagId])
+  @@map("client_tags")
+}
+
+/// A note on exactly one client or brokerage.
+model Note {
+  id           String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  clientId     String?   @map("client_id") @db.Uuid
+  brokerageId  String?   @map("brokerage_id") @db.Uuid
+  authorUserId String?   @map("author_user_id") @db.Uuid
+  body         String
+  pinned       Boolean   @default(false)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  client    Client?    @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  brokerage Brokerage? @relation(fields: [brokerageId], references: [id], onDelete: Restrict)
+  author    User?      @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, clientId, createdAt])
+  @@index([tenantId, brokerageId, createdAt])
+  @@map("notes")
+}
+
+/// The client timeline: everything that happened to a client, newest first.
+model ClientActivity {
+  id          String   @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
+  type        String
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  data        Json     @default("{}")
+  occurredAt  DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+  actor  User?  @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, clientId, occurredAt(sort: Desc)])
+  @@map("client_activities")
+}
+
+model SavedView {
+  id        String          @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId  String          @map("tenant_id") @db.Uuid
+  userId    String          @map("user_id") @db.Uuid
+  entity    SavedViewEntity
+  name      String
+  filters   Json            @default("{}")
+  shared    Boolean         @default(false)
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, entity, userId])
+  @@map("saved_views")
+}
+
+model ImportJob {
+  id              String       @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId        String       @map("tenant_id") @db.Uuid
+  entity          ImportEntity
+  status          ImportStatus @default(awaiting_upload)
+  fileKey         String       @map("file_key")
+  fileName        String       @map("file_name")
+  fileSize        Int          @map("file_size")
+  mapping         Json?
+  totalRows       Int          @default(0) @map("total_rows")
+  processedRows   Int          @default(0) @map("processed_rows")
+  createdCount    Int          @default(0) @map("created_count")
+  updatedCount    Int          @default(0) @map("updated_count")
+  errorCount      Int          @default(0) @map("error_count")
+  errorReportKey  String?      @map("error_report_key")
+  lastError       String?      @map("last_error")
+  createdByUserId String?      @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt       DateTime?    @map("started_at") @db.Timestamptz(6)
+  finishedAt      DateTime?    @map("finished_at") @db.Timestamptz(6)
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  createdBy User?  @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, createdAt])
+  @@map("import_jobs")
+}
+
+model ExportJob {
+  id              String       @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId        String       @map("tenant_id") @db.Uuid
+  entity          String
+  filters         Json         @default("{}")
+  status          ExportStatus @default(queued)
+  fileKey         String?      @map("file_key")
+  rowCount        Int          @default(0) @map("row_count")
+  lastError       String?      @map("last_error")
+  createdByUserId String?      @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  finishedAt      DateTime?    @map("finished_at") @db.Timestamptz(6)
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  createdBy User?  @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, createdAt])
+  @@map("export_jobs")
+}
+
+// =============================================================================================
+// Phase 2: catalog
+// =============================================================================================
+
+enum ServiceCategory {
+  photo
+  video
+  drone
+  tour_3d
+  floor_plan
+  twilight
+  virtual_staging
+  other
+
+  @@map("service_category")
+}
+
+enum DeliverableType {
+  photos
+  video
+  tour
+  floor_plan
+  document
+  other
+
+  @@map("deliverable_type")
+}
+
+enum ItemKind {
+  variant
+  package
+  add_on
+
+  @@map("item_kind")
+}
+
+model Skill {
+  id        String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  services Service[]
+
+  @@map("skills")
+}
+
+model Service {
+  id              String          @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId        String          @map("tenant_id") @db.Uuid
+  name            String
+  description     String?
+  category        ServiceCategory
+  durationMinutes Int             @map("duration_minutes")
+  requiredSkillId String?         @map("required_skill_id") @db.Uuid
+  deliverableType DeliverableType @map("deliverable_type")
+  taxable         Boolean         @default(true)
+  active          Boolean         @default(true)
+  sortOrder       Int             @default(0) @map("sort_order")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?       @map("deleted_at") @db.Timestamptz(6)
+
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  requiredSkill Skill?           @relation(fields: [requiredSkillId], references: [id], onDelete: Restrict)
+  variants      ServiceVariant[]
+  addOns        AddOn[]
+
+  @@index([tenantId, sortOrder])
+  @@map("services")
+}
+
+model ServiceVariant {
+  id              String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  serviceId       String    @map("service_id") @db.Uuid
+  name            String
+  basePrice       Int       @map("base_price")
+  durationMinutes Int?      @map("duration_minutes")
+  active          Boolean   @default(true)
+  sortOrder       Int       @default(0) @map("sort_order")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  service      Service       @relation(fields: [serviceId], references: [id])
+  packageItems PackageItem[]
+
+  @@index([tenantId, serviceId])
+  @@map("service_variants")
+}
+
+model Package {
+  id          String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String
+  description String?
+  basePrice   Int       @map("base_price")
+  taxable     Boolean   @default(true)
+  active      Boolean   @default(true)
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id])
+  items  PackageItem[]
+
+  @@index([tenantId, sortOrder])
+  @@map("packages")
+}
+
+model PackageItem {
+  tenantId  String @map("tenant_id") @db.Uuid
+  packageId String @map("package_id") @db.Uuid
+  variantId String @map("variant_id") @db.Uuid
+  quantity  Int    @default(1)
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  package Package        @relation(fields: [packageId], references: [id])
+  variant ServiceVariant @relation(fields: [variantId], references: [id])
+
+  @@id([tenantId, packageId, variantId])
+  @@map("package_items")
+}
+
+model AddOn {
+  id              String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  serviceId       String?   @map("service_id") @db.Uuid
+  name            String
+  description     String?
+  basePrice       Int       @map("base_price")
+  durationMinutes Int       @default(0) @map("duration_minutes")
+  maxQuantity     Int?      @map("max_quantity")
+  taxable         Boolean   @default(true)
+  active          Boolean   @default(true)
+  sortOrder       Int       @default(0) @map("sort_order")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, sortOrder])
+  @@map("add_ons")
+}
+
+// =============================================================================================
+// Phase 2: pricing
+// =============================================================================================
+
+enum TravelRuleKind {
+  territory
+  distance
+
+  @@map("travel_rule_kind")
+}
+
+enum CouponKind {
+  percent
+  fixed
+
+  @@map("coupon_kind")
+}
+
+model PropertyType {
+  id        String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  key       String
+  name      String
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  priceRules PriceRule[]
+
+  @@unique([tenantId, key])
+  @@map("property_types")
+}
+
+/// Property size range [min_size, max_size) in the tenant's measurement unit.
+model SizeBand {
+  id        String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  minSize   Int       @map("min_size")
+  maxSize   Int?      @map("max_size")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  priceRules PriceRule[]
+
+  @@index([tenantId, minSize])
+  @@map("size_bands")
+}
+
+/// Price of one item for a size band and/or property type (either may be null = any).
+model PriceRule {
+  id             String   @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  itemKind       ItemKind @map("item_kind")
+  itemId         String   @map("item_id") @db.Uuid
+  sizeBandId     String?  @map("size_band_id") @db.Uuid
+  propertyTypeId String?  @map("property_type_id") @db.Uuid
+  price          Int
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  sizeBand     SizeBand?     @relation(fields: [sizeBandId], references: [id], onDelete: Restrict)
+  propertyType PropertyType? @relation(fields: [propertyTypeId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, itemKind, itemId])
+  @@map("price_rules")
+}
+
+model ClientPriceList {
+  id                   String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  name                 String
+  description          String?
+  defaultPercentOffBps Int       @default(0) @map("default_percent_off_bps")
+  waiveTravel          Boolean   @default(false) @map("waive_travel")
+  active               Boolean   @default(true)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant     Tenant                @relation(fields: [tenantId], references: [id])
+  items      ClientPriceListItem[]
+  clients    Client[]
+  brokerages Brokerage[]
+
+  @@index([tenantId, name])
+  @@map("client_price_lists")
+}
+
+model ClientPriceListItem {
+  id            String   @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  priceListId   String   @map("price_list_id") @db.Uuid
+  itemKind      ItemKind @map("item_kind")
+  itemId        String   @map("item_id") @db.Uuid
+  fixedPrice    Int?     @map("fixed_price")
+  percentOffBps Int?     @map("percent_off_bps")
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  priceList ClientPriceList @relation(fields: [priceListId], references: [id])
+
+  @@unique([tenantId, priceListId, itemKind, itemId])
+  @@map("client_price_list_items")
+}
+
+model Territory {
+  id             String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  name           String
+  description    String?
+  postalPrefixes String[]  @default([]) @map("postal_prefixes")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  travelFeeRules TravelFeeRule[]
+
+  @@index([tenantId, name])
+  @@map("territories")
+}
+
+model TravelFeeRule {
+  id          String         @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId    String         @map("tenant_id") @db.Uuid
+  name        String
+  kind        TravelRuleKind
+  territoryId String?        @map("territory_id") @db.Uuid
+  fee         Int?
+  freeKm      Int?           @map("free_km")
+  perKm       Int?           @map("per_km")
+  minFee      Int?           @map("min_fee")
+  maxFee      Int?           @map("max_fee")
+  priority    Int            @default(100)
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?      @map("deleted_at") @db.Timestamptz(6)
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  territory Territory? @relation(fields: [territoryId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, priority])
+  @@map("travel_fee_rules")
+}
+
+model Coupon {
+  id              String     @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId        String     @map("tenant_id") @db.Uuid
+  code            String
+  description     String?
+  kind            CouponKind
+  percentOffBps   Int?       @map("percent_off_bps")
+  amountOff       Int?       @map("amount_off")
+  minSubtotal     Int?       @map("min_subtotal")
+  startsAt        DateTime?  @map("starts_at") @db.Timestamptz(6)
+  expiresAt       DateTime?  @map("expires_at") @db.Timestamptz(6)
+  maxRedemptions  Int?       @map("max_redemptions")
+  maxPerClient    Int?       @map("max_per_client")
+  redemptionCount Int        @default(0) @map("redemption_count")
+  active          Boolean    @default(true)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz(6)
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id])
+  redemptions CouponRedemption[]
+
+  @@index([tenantId, createdAt])
+  @@map("coupons")
+}
+
+/// Written when an order using the coupon is booked (Phase 3); counted by the pricing engine.
+model CouponRedemption {
+  id         String   @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  couponId   String   @map("coupon_id") @db.Uuid
+  clientId   String?  @map("client_id") @db.Uuid
+  amount     Int
+  redeemedAt DateTime @default(now()) @map("redeemed_at") @db.Timestamptz(6)
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  coupon Coupon  @relation(fields: [couponId], references: [id])
+  client Client? @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, couponId, clientId])
+  @@map("coupon_redemptions")
+}
+
+model TaxRate {
+  id              String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  name            String
+  rateBps         Int       @map("rate_bps")
+  regionCode      String?   @map("region_code")
+  appliesToTravel Boolean   @default(false) @map("applies_to_travel")
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, regionCode])
+  @@map("tax_rates")
 }

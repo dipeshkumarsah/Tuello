@@ -59,7 +59,15 @@ export interface PriceRule {
 }
 
 export type TravelFeeRule =
-  | { id: string; name: string; kind: 'territory'; priority: number; active: boolean; territoryId: string; fee: number }
+  | {
+      id: string;
+      name: string;
+      kind: 'territory';
+      priority: number;
+      active: boolean;
+      territoryId: string;
+      fee: number;
+    }
   | {
       id: string;
       name: string;
@@ -214,7 +222,11 @@ export interface QuoteResult {
   subtotal: number;
   coupon: { code: string; status: CouponStatus; amount: number } | null;
   discount: number;
-  travel: { fee: number; ruleId: string | null; reason: 'territory' | 'distance' | 'waived' | 'none' };
+  travel: {
+    fee: number;
+    ruleId: string | null;
+    reason: 'territory' | 'distance' | 'waived' | 'none';
+  };
   taxes: QuoteTax[];
   tax: number;
   total: number;

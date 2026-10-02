@@ -23,6 +23,32 @@ const TENANT_TABLES: Record<keyof TenantFixture['ids'], { pk: string; tenantCol:
   audit_logs: { pk: 'id', tenantCol: 'tenant_id' },
   outbox_events: { pk: 'id', tenantCol: 'tenant_id' },
   feature_flags: { pk: 'id', tenantCol: 'tenant_id' },
+  brokerages: { pk: 'id', tenantCol: 'tenant_id' },
+  clients: { pk: 'id', tenantCol: 'tenant_id' },
+  client_contacts: { pk: 'id', tenantCol: 'tenant_id' },
+  tags: { pk: 'id', tenantCol: 'tenant_id' },
+  client_tags: { pk: 'client_id', tenantCol: 'tenant_id' },
+  notes: { pk: 'id', tenantCol: 'tenant_id' },
+  client_activities: { pk: 'id', tenantCol: 'tenant_id' },
+  saved_views: { pk: 'id', tenantCol: 'tenant_id' },
+  import_jobs: { pk: 'id', tenantCol: 'tenant_id' },
+  export_jobs: { pk: 'id', tenantCol: 'tenant_id' },
+  skills: { pk: 'id', tenantCol: 'tenant_id' },
+  services: { pk: 'id', tenantCol: 'tenant_id' },
+  service_variants: { pk: 'id', tenantCol: 'tenant_id' },
+  packages: { pk: 'id', tenantCol: 'tenant_id' },
+  package_items: { pk: 'package_id', tenantCol: 'tenant_id' },
+  add_ons: { pk: 'id', tenantCol: 'tenant_id' },
+  property_types: { pk: 'id', tenantCol: 'tenant_id' },
+  size_bands: { pk: 'id', tenantCol: 'tenant_id' },
+  price_rules: { pk: 'id', tenantCol: 'tenant_id' },
+  client_price_lists: { pk: 'id', tenantCol: 'tenant_id' },
+  client_price_list_items: { pk: 'id', tenantCol: 'tenant_id' },
+  territories: { pk: 'id', tenantCol: 'tenant_id' },
+  travel_fee_rules: { pk: 'id', tenantCol: 'tenant_id' },
+  coupons: { pk: 'id', tenantCol: 'tenant_id' },
+  coupon_redemptions: { pk: 'id', tenantCol: 'tenant_id' },
+  tax_rates: { pk: 'id', tenantCol: 'tenant_id' },
 };
 
 // A harmless column to touch in UPDATE attempts.
@@ -38,6 +64,32 @@ const UPDATE_SQL: Record<string, string> = {
   audit_logs: `action = 'pwned'`,
   outbox_events: `published_at = now()`,
   feature_flags: `enabled = false`,
+  brokerages: `name = 'pwned'`,
+  clients: `first_name = 'pwned'`,
+  client_contacts: `name = 'pwned'`,
+  tags: `name = 'pwned'`,
+  client_tags: `created_at = now()`,
+  notes: `body = 'pwned'`,
+  client_activities: `type = 'pwned'`,
+  saved_views: `name = 'pwned'`,
+  import_jobs: `status = 'failed'`,
+  export_jobs: `status = 'failed'`,
+  skills: `name = 'pwned'`,
+  services: `name = 'pwned'`,
+  service_variants: `base_price = 0`,
+  packages: `base_price = 0`,
+  package_items: `quantity = 99`,
+  add_ons: `base_price = 0`,
+  property_types: `name = 'pwned'`,
+  size_bands: `name = 'pwned'`,
+  price_rules: `price = 0`,
+  client_price_lists: `default_percent_off_bps = 10000`,
+  client_price_list_items: `fixed_price = 0`,
+  territories: `name = 'pwned'`,
+  travel_fee_rules: `fee = 0`,
+  coupons: `percent_off_bps = 10000`,
+  coupon_redemptions: `amount = 0`,
+  tax_rates: `rate_bps = 0`,
 };
 
 let tdb: TestDatabase;
@@ -201,6 +253,35 @@ describe('cross-tenant inserts are rejected', () => {
     await expect(asApp(ctxA(), (c) => c.query(sql, params(B)))).rejects.toThrow(
       /row-level security/,
     );
+  });
+
+  it("a row cannot reference another tenant's row (composite tenant foreign keys)", async () => {
+    // FK checks bypass RLS, so this is enforced by (tenant_id, x_id) -> (tenant_id, id) keys.
+    for (const [sql, params] of [
+      [`UPDATE clients SET brokerage_id = $1 WHERE id = $2`, [B.ids.brokerages, A.ids.clients]],
+      [
+        `UPDATE clients SET price_list_id = $1 WHERE id = $2`,
+        [B.ids.client_price_lists, A.ids.clients],
+      ],
+      [
+        `INSERT INTO client_tags (tenant_id, client_id, tag_id) VALUES ($1, $2, $3)`,
+        [A.tenantId, A.ids.clients, B.ids.tags],
+      ],
+      [
+        `INSERT INTO notes (tenant_id, client_id, body) VALUES ($1, $2, 'x')`,
+        [A.tenantId, B.ids.clients],
+      ],
+      [
+        `INSERT INTO service_variants (tenant_id, service_id, name, base_price) VALUES ($1, $2, 'x', 1)`,
+        [A.tenantId, B.ids.services],
+      ],
+      [
+        `UPDATE price_rules SET size_band_id = $1 WHERE id = $2`,
+        [B.ids.size_bands, A.ids.price_rules],
+      ],
+    ] as Array<[string, unknown[]]>) {
+      await expect(asApp(ctxA(), (c) => c.query(sql, params))).rejects.toThrow(/foreign key/);
+    }
   });
 
   it('tenant A cannot move its own row into tenant B', async () => {
@@ -493,6 +574,23 @@ describe('schema.prisma matches the migrated database', () => {
     'outbox_events_unpublished_idx',
     'sessions_tenant_id_expires_at_idx',
     'auth_tokens_tenant_id_expires_at_idx',
+    'clients_search_trgm_idx',
+    'clients_search_fts_idx',
+    'brokerages_search_trgm_idx',
+    'clients_email_live_key',
+    'clients_external_ref_live_key',
+    'brokerages_name_live_key',
+    'brokerages_external_ref_live_key',
+    'tags_name_key',
+    'skills_name_live_key',
+    'coupons_code_live_key',
+    'price_rules_item_band_type_key',
+  ];
+  // Generated search columns and composite tenant FKs (and their unique keys) are SQL-only.
+  const SQL_ONLY = [
+    /^DROP INDEX "\w+_tenant_id_id_key";$/,
+    /^ALTER TABLE "\w+" DROP CONSTRAINT "\w+_tscope_fkey";$/,
+    /DROP COLUMN "search_(text|vector)"[,;]$/,
   ];
 
   it('has no drift beyond SQL-only indexes', async () => {
@@ -519,7 +617,8 @@ describe('schema.prisma matches the migrated database', () => {
       .split('\n')
       .map((l) => l.trim())
       .filter((l) => l && !l.startsWith('--'))
-      .filter((l) => !SQL_ONLY_INDEXES.some((i) => l === `DROP INDEX "${i}";`));
+      .filter((l) => !SQL_ONLY_INDEXES.some((i) => l === `DROP INDEX "${i}";`))
+      .filter((l) => !SQL_ONLY.some((re) => re.test(l)));
     expect(statements).toEqual([]);
   });
 });

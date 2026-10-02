@@ -8,6 +8,7 @@
  */
 import { ROLES, type Role } from '@tuello/shared';
 import { createDatabase } from './database';
+import { seedStarterCatalog } from './defaults';
 import { hashPassword } from './password';
 import { uuidv7 } from './uuid';
 
@@ -48,7 +49,7 @@ async function main() {
   for (const t of TENANTS) {
     const existing = await db.system.tenantBySlug(t.slug);
     if (existing) {
-      console.warn(`seed: tenant "${t.slug}" exists, skipping`);
+      await seedPhase2(db, existing.id, t.unit, t.slug);
       continue;
     }
     const tenantId = uuidv7();
@@ -97,6 +98,119 @@ async function main() {
     );
   }
   await db.disconnect();
+}
+
+/** Catalog, pricing and a small CRM for a demo tenant. Each part is skipped if already present. */
+async function seedPhase2(
+  db: ReturnType<typeof createDatabase>,
+  tenantId: string,
+  unit: 'sqft' | 'm2',
+  slug: string,
+) {
+  await db.withTenant({ tenantId }, async (tx) => {
+    const created = await seedStarterCatalog(tx, tenantId, unit);
+    if (created) console.warn(`seed: ${slug} starter catalog`);
+    if ((await tx.clientPriceList.count()) === 0) {
+      await tx.clientPriceList.create({
+        data: {
+          tenantId,
+          name: 'Top producers',
+          description: '10% off everything',
+          defaultPercentOffBps: 1_000,
+        },
+      });
+      await tx.coupon.create({
+        data: {
+          tenantId,
+          code: 'WELCOME10',
+          description: 'First order',
+          kind: 'percent',
+          percentOffBps: 1_000,
+          maxPerClient: 1,
+        },
+      });
+      await tx.taxRate.create({
+        data:
+          unit === 'm2'
+            ? { tenantId, name: 'VAT', rateBps: 2_000, regionCode: 'GB', appliesToTravel: true }
+            : {
+                tenantId,
+                name: 'Sales tax',
+                rateBps: 875,
+                regionCode: 'US-NY',
+                appliesToTravel: false,
+              },
+      });
+      const territory = await tx.territory.create({
+        data: {
+          tenantId,
+          name: 'Downtown',
+          postalPrefixes: unit === 'm2' ? ['EC', 'WC'] : ['100'],
+        },
+      });
+      await tx.travelFeeRule.create({
+        data: {
+          tenantId,
+          name: 'Downtown parking',
+          kind: 'territory',
+          territoryId: territory.id,
+          fee: 2_500,
+          priority: 1,
+        },
+      });
+      await tx.travelFeeRule.create({
+        data: {
+          tenantId,
+          name: 'Mileage',
+          kind: 'distance',
+          freeKm: 30,
+          perKm: 120,
+          minFee: 1_000,
+          maxFee: 15_000,
+          priority: 10,
+        },
+      });
+    }
+    if ((await tx.client.count()) === 0) {
+      const brokerages = await Promise.all(
+        ['Harbor Realty', 'Summit Properties', 'Keystone Homes'].map((name) =>
+          tx.brokerage.create({
+            data: { tenantId, name, city: unit === 'm2' ? 'London' : 'New York' },
+          }),
+        ),
+      );
+      const people = [
+        ['Maya', 'Chen'],
+        ['Luis', 'Ortega'],
+        ['Priya', 'Natarajan'],
+        ['Tom', 'Becker'],
+        ['Ava', 'Goldberg'],
+        ['Noah', 'Williams'],
+        ['Zoe', 'Martin'],
+        ['Ethan', 'Brooks'],
+        ['Isla', 'Murphy'],
+        ['Omar', 'Haddad'],
+        ['Grace', 'Kim'],
+        ['Leo', 'Rossi'],
+      ];
+      for (const [i, [first, last]] of people.entries()) {
+        const email = `${first!.toLowerCase()}.${last!.toLowerCase()}@${slug}-agents.test`;
+        await tx.client.create({
+          data: {
+            tenantId,
+            firstName: first!,
+            lastName: last!,
+            sortName: `${last} ${first} ${email}`.toLowerCase(),
+            email,
+            phone: `+1 212 555 01${String(i).padStart(2, '0')}`,
+            phoneNormalized: `21255501${String(i).padStart(2, '0')}`,
+            brokerageId: brokerages[i % 3]!.id,
+          },
+        });
+      }
+      console.warn(`seed: ${slug} demo brokerages and clients`);
+    }
+  });
 }
 
 main().catch((err) => {

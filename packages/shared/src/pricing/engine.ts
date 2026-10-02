@@ -1,4 +1,12 @@
-import { allocate, assertBps, assertMoney, convertSize, percentOf, percentOff, PricingInputError } from './money';
+import {
+  allocate,
+  assertBps,
+  assertMoney,
+  convertSize,
+  percentOf,
+  percentOff,
+  PricingInputError,
+} from './money';
 import type {
   CatalogAddOn,
   CouponInput,
@@ -46,11 +54,23 @@ export function quote(input: QuoteInput): QuoteResult {
     if (!found.active) return warnings.push({ code: 'inactive_item', itemId: item.id });
     const quantity = item.quantity ?? 1;
     const max: number | null = item.kind === 'add_on' ? (found as CatalogAddOn).maxQuantity : null;
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000 || (max != null && quantity > max)) {
+    if (
+      !Number.isInteger(quantity) ||
+      quantity < 1 ||
+      quantity > 1000 ||
+      (max != null && quantity > max)
+    ) {
       return warnings.push({ code: 'invalid_quantity', itemId: item.id });
     }
 
-    const standard = standardPrice(catalog, item.kind, item.id, found.basePrice, band?.id ?? null, propertyTypeId);
+    const standard = standardPrice(
+      catalog,
+      item.kind,
+      item.id,
+      found.basePrice,
+      band?.id ?? null,
+      propertyTypeId,
+    );
     let unitPrice = standard.price;
     let source: PriceSource = standard.source;
     if (priceList) {
@@ -95,19 +115,30 @@ export function quote(input: QuoteInput): QuoteResult {
     const status = input.coupon ? couponStatus(input.coupon, subtotal, asOf) : 'not_found';
     if (status === 'applied') discount = couponAmount(input.coupon!, subtotal);
     coupon = { code, status, amount: discount };
-    allocate(discount, lines.map((l) => l.amount)).forEach((d, i) => (lines[i]!.discount = d));
+    allocate(
+      discount,
+      lines.map((l) => l.amount),
+    ).forEach((d, i) => (lines[i]!.discount = d));
   }
 
   // ------------------------------------------------------------------ 4: travel
   const travel = travelFee(catalog, property, priceList?.waiveTravel ?? false);
 
   // ------------------------------------------------------------------ 5: tax
-  const taxableItems = lines.filter((l) => l.taxable).reduce((s, l) => s + l.amount - l.discount, 0);
+  const taxableItems = lines
+    .filter((l) => l.taxable)
+    .reduce((s, l) => s + l.amount - l.discount, 0);
   const taxes: QuoteTax[] = catalog.taxRates
     .filter((r) => r.active && regionMatches(r.regionCode, property.regionCode))
     .map((r) => {
       const base = taxableItems + (r.appliesToTravel ? travel.fee : 0);
-      return { rateId: r.id, name: r.name, rateBps: r.rateBps, base, amount: percentOf(base, r.rateBps) };
+      return {
+        rateId: r.id,
+        name: r.name,
+        rateBps: r.rateBps,
+        base,
+        amount: percentOf(base, r.rateBps),
+      };
     })
     .filter((t) => t.base > 0 || t.amount > 0);
   const tax = taxes.reduce((s, t) => s + t.amount, 0);
@@ -131,15 +162,23 @@ export function quote(input: QuoteInput): QuoteResult {
 }
 
 function validateCatalog(c: PricingCatalog) {
-  for (const v of [...c.variants, ...c.packages, ...c.addOns]) assertMoney(v.basePrice, `base price of ${v.id}`);
+  for (const v of [...c.variants, ...c.packages, ...c.addOns])
+    assertMoney(v.basePrice, `base price of ${v.id}`);
   for (const r of c.priceRules) assertMoney(r.price, `price rule for ${r.itemId}`);
   for (const t of c.taxRates) assertBps(t.rateBps, `tax rate ${t.id}`);
 }
 
 export function findSizeBand(catalog: PricingCatalog, property: PropertyInput): SizeBand | null {
   if (property.size == null || !Number.isFinite(property.size) || property.size < 0) return null;
-  const size = convertSize(property.size, property.sizeUnit ?? catalog.measurementUnit, catalog.measurementUnit);
-  return catalog.sizeBands.find((b) => size >= b.minSize && (b.maxSize == null || size < b.maxSize)) ?? null;
+  const size = convertSize(
+    property.size,
+    property.sizeUnit ?? catalog.measurementUnit,
+    catalog.measurementUnit,
+  );
+  return (
+    catalog.sizeBands.find((b) => size >= b.minSize && (b.maxSize == null || size < b.maxSize)) ??
+    null
+  );
 }
 
 function findItem(catalog: PricingCatalog, kind: ItemKind, id: string) {
@@ -161,7 +200,8 @@ function standardPrice(
   typeId: string | null,
 ): { price: number; source: PriceSource } {
   const rules = catalog.priceRules.filter((r) => r.itemKind === kind && r.itemId === itemId);
-  const pick = (b: string | null, t: string | null) => rules.find((r) => r.sizeBandId === b && r.propertyTypeId === t);
+  const pick = (b: string | null, t: string | null) =>
+    rules.find((r) => r.sizeBandId === b && r.propertyTypeId === t);
   if (bandId && typeId) {
     const r = pick(bandId, typeId);
     if (r) return { price: r.price, source: 'size_band_property_type' };
@@ -197,12 +237,20 @@ function couponAmount(c: CouponInput, subtotal: number): number {
   return Math.min(c.amountOff ?? 0, subtotal);
 }
 
-function travelFee(catalog: PricingCatalog, property: PropertyInput, waived: boolean): QuoteResult['travel'] {
-  const rules = catalog.travelFeeRules.filter((r) => r.active).sort((a, b) => a.priority - b.priority);
+function travelFee(
+  catalog: PricingCatalog,
+  property: PropertyInput,
+  waived: boolean,
+): QuoteResult['travel'] {
+  const rules = catalog.travelFeeRules
+    .filter((r) => r.active)
+    .sort((a, b) => a.priority - b.priority);
   for (const r of rules) {
     if (r.kind === 'territory' && property.territoryId && r.territoryId === property.territoryId) {
       assertMoney(r.fee, 'territory fee');
-      return waived ? { fee: 0, ruleId: r.id, reason: 'waived' } : { fee: r.fee, ruleId: r.id, reason: 'territory' };
+      return waived
+        ? { fee: 0, ruleId: r.id, reason: 'waived' }
+        : { fee: r.fee, ruleId: r.id, reason: 'territory' };
     }
     if (r.kind === 'distance' && property.distanceKm != null && property.distanceKm >= 0) {
       const billable = Math.max(0, Math.ceil(property.distanceKm - r.freeKm - 1e-9));
@@ -212,13 +260,18 @@ function travelFee(catalog: PricingCatalog, property: PropertyInput, waived: boo
         if (r.maxFee != null) fee = Math.min(fee, r.maxFee);
       }
       assertMoney(fee, 'distance fee');
-      return waived ? { fee: 0, ruleId: r.id, reason: 'waived' } : { fee, ruleId: r.id, reason: 'distance' };
+      return waived
+        ? { fee: 0, ruleId: r.id, reason: 'waived' }
+        : { fee, ruleId: r.id, reason: 'distance' };
     }
   }
   return { fee: 0, ruleId: null, reason: 'none' };
 }
 
-export function regionMatches(rateRegion: string | null, propertyRegion: string | null | undefined): boolean {
+export function regionMatches(
+  rateRegion: string | null,
+  propertyRegion: string | null | undefined,
+): boolean {
   if (!rateRegion) return true;
   if (!propertyRegion) return false;
   const a = rateRegion.toUpperCase();

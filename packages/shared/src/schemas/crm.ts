@@ -100,7 +100,10 @@ export const contactInputSchema = z.object({
 
 export const tagInputSchema = z.object({ name: z.string().trim().min(1).max(50) });
 
-export const noteInputSchema = z.object({ body: z.string().trim().min(1).max(10_000), pinned: z.boolean().default(false) });
+export const noteInputSchema = z.object({
+  body: z.string().trim().min(1).max(10_000),
+  pinned: z.boolean().default(false),
+});
 
 export const CLIENT_SORTS = ['name', 'created'] as const;
 
@@ -206,7 +209,13 @@ export interface ActivityDto {
 }
 
 export interface DuplicateDto {
-  client: { id: string; displayName: string; email: string | null; phone: string | null; brokerage: string | null };
+  client: {
+    id: string;
+    displayName: string;
+    email: string | null;
+    phone: string | null;
+    brokerage: string | null;
+  };
   reasons: Array<'email' | 'phone' | 'name'>;
   score: number;
 }
