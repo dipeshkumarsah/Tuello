@@ -1,0 +1,37 @@
+{
+  "name": "@tuello/db",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "prisma"
+  ],
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "generate": "prisma generate",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --dir src",
+    "test:integration": "vitest run --dir test",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "seed": "node dist/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "@tuello/shared": "workspace:*",
+    "argon2": "^0.44.0"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^11.14.0",
+    "@types/node": "^22.18.0",
+    "@types/pg": "^8.15.5",
+    "pg": "^8.16.3",
+    "prisma": "6.19.3",
+    "testcontainers": "^11.14.0",
+    "vitest": "^3.2.7"
+  }
+}

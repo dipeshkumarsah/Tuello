@@ -1,0 +1,305 @@
+// Tuello database schema.
+//
+// Rules (see docs/ARCHITECTURE.md):
+// - Singular model names, snake_case plural table names.
+// - Every tenant-owned table has tenant_id NOT NULL -> tenants, first column of its indexes,
+//   and FORCED row-level security. Policies live in the SQL migrations, not here.
+// - IDs are UUID v7 (app.uuid_generate_v7()), timestamps are timestamptz (UTC).
+// - Migrations are hand-reviewed SQL in prisma/migrations and are forward-only.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+enum TenantStatus {
+  onboarding
+  active
+  suspended
+
+  @@map("tenant_status")
+}
+
+enum MeasurementUnit {
+  sqft
+  m2
+
+  @@map("measurement_unit")
+}
+
+enum Role {
+  owner
+  admin
+  coordinator
+  shooter
+  editor
+  client
+  brokerage_admin
+
+  @@map("role")
+}
+
+enum MembershipStatus {
+  active
+  disabled
+
+  @@map("membership_status")
+}
+
+enum DomainStatus {
+  pending
+  verified
+  failed
+
+  @@map("domain_status")
+}
+
+enum AuthTokenPurpose {
+  verify_email
+  reset_password
+  magic_link
+
+  @@map("auth_token_purpose")
+}
+
+model Tenant {
+  id                    String          @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  slug                  String          @unique
+  name                  String
+  status                TenantStatus    @default(onboarding)
+  timeZone              String          @default("America/New_York") @map("time_zone")
+  currency              String          @default("USD") @db.Char(3)
+  measurementUnit       MeasurementUnit @default(sqft) @map("measurement_unit")
+  taxLabel              String          @default("Tax") @map("tax_label")
+  locale                String          @default("en")
+  onboardingCompletedAt DateTime?       @map("onboarding_completed_at") @db.Timestamptz(6)
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt             DateTime?       @map("deleted_at") @db.Timestamptz(6)
+
+  domains      TenantDomain[]
+  branding     TenantBranding?
+  memberships  Membership[]
+  sessions     Session[]
+  invites      Invite[]
+  authTokens   AuthToken[]
+  auditLogs    AuditLog[]
+  outboxEvents OutboxEvent[]
+  featureFlags FeatureFlag[]
+
+  @@map("tenants")
+}
+
+model TenantDomain {
+  id                String       @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId          String       @map("tenant_id") @db.Uuid
+  hostname          String
+  verificationToken String       @map("verification_token")
+  status            DomainStatus @default(pending)
+  verifiedAt        DateTime?    @map("verified_at") @db.Timestamptz(6)
+  lastCheckedAt     DateTime?    @map("last_checked_at") @db.Timestamptz(6)
+  lastError         String?      @map("last_error")
+  checkAttempts     Int          @default(0) @map("check_attempts")
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime?    @map("deleted_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("tenant_domains")
+}
+
+model TenantBranding {
+  tenantId        String   @id @map("tenant_id") @db.Uuid
+  logoKey         String?  @map("logo_key")
+  accentColor     String?  @map("accent_color") @db.Char(7)
+  emailSenderName String?  @map("email_sender_name")
+  emailReplyTo    String?  @map("email_reply_to")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("tenant_brandings")
+}
+
+/// Global identity. One person may belong to several tenants through memberships.
+/// RLS: visible only to itself or to members of the current tenant.
+model User {
+  id              String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  email           String    @unique
+  name            String
+  passwordHash    String?   @map("password_hash")
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  /// AES-256-GCM ciphertext (see apps/api crypto); never the raw secret.
+  totpSecret      String?   @map("totp_secret")
+  totpEnabledAt   DateTime? @map("totp_enabled_at") @db.Timestamptz(6)
+  locale          String    @default("en")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  memberships Membership[]
+  sessions    Session[]
+  authTokens  AuthToken[]
+  invitesSent Invite[]     @relation("InvitedBy")
+  auditLogs   AuditLog[]
+
+  @@map("users")
+}
+
+model Membership {
+  id        String           @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  role      Role
+  status    MembershipStatus @default(active)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime?        @map("deleted_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, role])
+  @@map("memberships")
+}
+
+/// Durable record of a login session. The hot copy lives in Valkey.
+model Session {
+  id         String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @map("token_hash")
+  ip         String?
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, tokenHash])
+  @@index([tenantId, userId])
+  @@map("sessions")
+}
+
+model Invite {
+  id              String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  email           String
+  role            Role
+  tokenHash       String    @map("token_hash")
+  invitedByUserId String?   @map("invited_by_user_id") @db.Uuid
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt      DateTime? @map("accepted_at") @db.Timestamptz(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  invitedBy User?  @relation("InvitedBy", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, tokenHash])
+  @@index([tenantId, email])
+  @@index([tenantId, createdAt])
+  @@map("invites")
+}
+
+/// One-time tokens for email verification, password reset, and magic links (hash only).
+model AuthToken {
+  id         String           @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId   String           @map("tenant_id") @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  purpose    AuthTokenPurpose
+  tokenHash  String           @map("token_hash")
+  expiresAt  DateTime         @map("expires_at") @db.Timestamptz(6)
+  consumedAt DateTime?        @map("consumed_at") @db.Timestamptz(6)
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, tokenHash])
+  @@index([tenantId, userId, purpose])
+  @@map("auth_tokens")
+}
+
+model AuditLog {
+  id          String   @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id") @db.Uuid
+  data        Json     @default("{}")
+  ip          String?
+  requestId   String?  @map("request_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  actor  User?  @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([tenantId, entityType, entityId])
+  @@map("audit_logs")
+}
+
+/// Transactional outbox. Written in the same transaction as the change it describes.
+model OutboxEvent {
+  id            String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String
+  aggregateType String    @map("aggregate_type")
+  aggregateId   String?   @map("aggregate_id") @db.Uuid
+  payload       Json      @default("{}")
+  occurredAt    DateTime  @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  lockedUntil   DateTime? @map("locked_until") @db.Timestamptz(6)
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz(6)
+  attempts      Int       @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, occurredAt])
+  @@map("outbox_events")
+}
+
+/// Raw third-party webhook deliveries. Platform-level: the tenant is resolved after verification.
+model WebhookEvent {
+  id              String    @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  provider        String
+  providerEventId String    @map("provider_event_id")
+  tenantId        String?   @map("tenant_id") @db.Uuid
+  type            String
+  payload         Json
+  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz(6)
+  processedAt     DateTime? @map("processed_at") @db.Timestamptz(6)
+  attempts        Int       @default(0)
+  lastError       String?   @map("last_error")
+
+  @@unique([provider, providerEventId])
+  @@map("webhook_events")
+}
+
+/// tenant_id NULL = platform default; a tenant row overrides it.
+model FeatureFlag {
+  id        String   @id @default(dbgenerated("app.uuid_generate_v7()")) @db.Uuid
+  tenantId  String?  @map("tenant_id") @db.Uuid
+  key       String
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@map("feature_flags")
+}

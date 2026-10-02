@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+  - e2e
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - prisma
+  - argon2
+  - sharp
+  - esbuild
+  - '@swc/core'
+  - msgpackr-extract
+  - unrs-resolver
