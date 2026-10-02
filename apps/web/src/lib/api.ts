@@ -37,7 +37,7 @@ async function ensureCsrf(): Promise<string> {
 
 /** The web app talks to the same public REST API customers use, same-origin under /api. */
 export async function api<T>(
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
   path: string,
   body?: unknown,
 ): Promise<T> {
@@ -72,6 +72,7 @@ export async function api<T>(
 export const get = <T>(path: string) => api<T>('GET', path);
 export const post = <T>(path: string, body?: unknown) => api<T>('POST', path, body);
 export const patch = <T>(path: string, body?: unknown) => api<T>('PATCH', path, body);
+export const put = <T>(path: string, body?: unknown) => api<T>('PUT', path, body);
 export const del = <T>(path: string) => api<T>('DELETE', path);
 
 /** Uploads straight to object storage with a presigned POST, reporting progress. */

@@ -15,6 +15,7 @@ export interface ComboboxProps {
   searchPlaceholder?: string;
   emptyText?: string;
   className?: string;
+  'aria-label'?: string;
   'aria-describedby'?: string;
   'aria-invalid'?: boolean;
 }
@@ -41,6 +42,7 @@ export function Combobox({
           type="button"
           role="combobox"
           aria-expanded={open}
+          aria-label={aria['aria-label']}
           aria-describedby={aria['aria-describedby']}
           aria-invalid={aria['aria-invalid']}
           className={cn(inputClass, 'items-center justify-between gap-2 text-left', className)}

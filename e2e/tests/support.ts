@@ -50,3 +50,34 @@ export async function expectAccessible(page: Page) {
 export function unique(prefix: string) {
   return `${prefix}${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`;
 }
+
+export const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'tuello-demo-password';
+
+/** Signs a seeded demo user in on a tenant host. */
+export async function signIn(page: Page, slug: string, email: string) {
+  await page.goto(tenantUrl(slug, '/login'));
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(SEED_PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('heading', { name: /Welcome/ })).toBeVisible();
+}
+
+/** Calls the API from inside the signed-in page, with the CSRF header the web client sends. */
+export async function apiCall<T>(page: Page, method: string, path: string, body?: unknown) {
+  return page.evaluate(
+    async ({ method, path, body }) => {
+      const csrf = () => document.cookie.match(/(?:^|; )tuello_csrf=([^;]*)/)?.[1];
+      if (method !== 'GET' && !csrf()) await fetch('/api/v1/auth/csrf');
+      const res = await fetch(`/api${path}`, {
+        method,
+        headers: {
+          'content-type': 'application/json',
+          ...(method === 'GET' ? {} : { 'x-csrf-token': decodeURIComponent(csrf() ?? '') }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      return { status: res.status, body: res.status === 204 ? null : await res.json() };
+    },
+    { method, path, body },
+  ) as Promise<{ status: number; body: T }>;
+}

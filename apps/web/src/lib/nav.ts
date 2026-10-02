@@ -1,6 +1,10 @@
 import type { MessageKey, Permission } from '@tuello/shared';
 import {
   AlertTriangle,
+  BadgeDollarSign,
+  Building2,
+  Contact,
+  Package,
   Globe,
   Home,
   Palette,
@@ -22,6 +26,22 @@ export interface NavItem {
 /** Navigation derived from the permissions matrix: each role sees only what it can open. */
 export const MAIN_NAV: NavItem[] = [
   { href: '/', label: 'nav.home', icon: Home, permission: 'self.manage', key: 'h' },
+  { href: '/clients', label: 'nav.clients', icon: Contact, permission: 'clients.read', key: 'c' },
+  {
+    href: '/brokerages',
+    label: 'nav.brokerages',
+    icon: Building2,
+    permission: 'clients.read',
+    key: 'b',
+  },
+  { href: '/catalog', label: 'nav.catalog', icon: Package, permission: 'catalog.read', key: 'k' },
+  {
+    href: '/pricing',
+    label: 'nav.pricing',
+    icon: BadgeDollarSign,
+    permission: 'pricing.read',
+    key: 'p',
+  },
   {
     href: '/settings/team',
     label: 'settings.team',
