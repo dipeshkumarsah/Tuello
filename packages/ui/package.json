@@ -48,7 +48,7 @@
     "@storybook/addon-essentials": "8.6.18",
     "@storybook/blocks": "8.6.18",
     "@storybook/react": "8.6.18",
-    "@storybook/react-vite": "8.6.18",
+    "@storybook/react-vite": "10.6.1",
     "@storybook/test": "8.6.18",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/react": "^16.3.3",
